@@ -793,7 +793,11 @@ function hacerLoginLider(){
 
   var btn = document.getElementById('btnLoginLider');
   conBotonCargando(btn, 'Entrando...', function(){
-    return llamarServidor('verificarPIN', usuario, pin).then(function(resp){
+    // CORREGIDO 10 sep 2026: ya NO usa verificarPIN a secas — verificarLiderParaDepartamento
+    // además confirma que esta cuenta esté autorizada para liberar justo esta etapa
+    // (CONTEXTO.departamento): su propio departamento, el que tenga asignado como líder,
+    // o cualquiera si es Supervisor/Administrador cubriendo a un líder ausente.
+    return llamarServidor('verificarLiderParaDepartamento', usuario, pin, CONTEXTO.departamento).then(function(resp){
       LIDER_SESION = resp;
       document.getElementById('liderIdentificado').textContent =
         'Líder identificado: ' + (resp.nombreLider || resp.usuario) + '.';
