@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Registro de Huellas</title>
+  <title>Registro de Rostros</title>
   <style>
     :root{
       --azul:#2563eb; --azul-oscuro:#1d4ed8; --navy:#0f172a; --rojo:#dc2626;
@@ -63,24 +63,25 @@
     .fila-cuenta:active{border-color:var(--azul);}
     .fila-cuenta .info b{display:block;font-size:14px;color:var(--texto);}
     .fila-cuenta .info span{display:block;font-size:12px;color:var(--gris);margin-top:2px;}
-    .estado-huella{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap;}
+    .estado-rostro{font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap;}
     .estado-si{background:#f0fdf4;color:var(--verde);}
     .estado-no{background:#fef3c7;color:var(--ambar);}
 
-    .huella-icono{width:60px;height:60px;margin:4px auto 12px;display:block;}
-    .huella-estado{text-align:center;font-size:13.5px;color:var(--gris);margin-bottom:6px;}
+    .rostro-estado{text-align:center;font-size:13.5px;color:var(--gris);margin-bottom:6px;}
     .centrado{text-align:center;}
 
     .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.5);
       border-top-color:#fff;border-radius:50%;animation:girar .7s linear infinite;vertical-align:-3px;margin-right:7px;}
     @keyframes girar{to{transform:rotate(360deg);}}
     .campo-ayuda{font-size:11.5px;color:var(--gris-claro);margin-top:4px;}
+
+    #videoRegistro{width:100%;max-width:320px;border-radius:12px;background:#0f172a;display:block;margin:10px auto;}
   </style>
 </head>
 <body>
 
 <header>
-  <div class="marca"><b>VUHL — REGISTRO DE HUELLAS</b><span id="lblHeader">Solo Administrador</span></div>
+  <div class="marca"><b>VUHL — REGISTRO DE ROSTROS</b><span id="lblHeader">Solo Administrador</span></div>
   <button id="btnSalir" hidden onclick="cerrarSesion()">Cerrar sesión</button>
 </header>
 
@@ -89,8 +90,8 @@
   <!-- ===================== PANTALLA: LOGIN (solo Administrador) ===================== -->
   <section id="p-login" class="pantalla">
     <div class="tarjeta">
-      <h1>Registro de huellas</h1>
-      <p class="subt">Entra con tu cuenta de Administrador para registrar la huella de un líder, Supervisor o Calidad.</p>
+      <h1>Registro de rostros</h1>
+      <p class="subt">Entra con tu cuenta de Administrador para registrar el rostro de un líder, Supervisor o Calidad.</p>
       <div class="banner-error" id="errLogin" hidden></div>
       <label>Usuario del Administrador</label>
       <input type="text" id="inUsuario" autocomplete="username" placeholder="admin@dominio.com"
@@ -106,37 +107,38 @@
   <section id="p-lista" class="pantalla">
     <div class="tarjeta">
       <h1>Cuentas</h1>
-      <p class="subt">Toca una cuenta para registrar o volver a registrar su huella.</p>
+      <p class="subt">Toca una cuenta para registrar o volver a registrar su rostro.</p>
       <div class="banner-error" id="errLista" hidden></div>
       <div class="lista-cuentas" id="listaCuentas"></div>
       <button class="btn-link" onclick="cargarCuentas()">Actualizar lista</button>
     </div>
   </section>
 
-  <!-- ===================== PANTALLA: REGISTRAR HUELLA ===================== -->
+  <!-- ===================== PANTALLA: REGISTRAR ROSTRO ===================== -->
   <section id="p-registrar" class="pantalla">
     <div class="tarjeta">
-      <h1 id="registrarTitulo">Registrar huella</h1>
+      <h1 id="registrarTitulo">Registrar rostro</h1>
       <p class="subt" id="registrarSubt"></p>
       <div class="banner-error" id="errRegistrar" hidden></div>
       <div class="banner-ok" id="okRegistrar" hidden></div>
 
-      <label>Nombre de quien registra su huella</label>
+      <label>Nombre de quien registra su rostro</label>
       <input type="text" id="inNombreLider" placeholder="Nombre completo">
 
-      <p class="campo-ayuda" id="diagnosticoContexto" style="background:#f1f5f9;padding:8px 10px;border-radius:8px;margin-top:10px;"></p>
-
-      <svg class="huella-icono" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5">
-        <path d="M12 11c0 3-1 5-1 7M8 12c0-3 1.6-5 4-5s4 2 4 5c0 1-.1 2-.3 3M16 15.5c.2-1 .3-2 .3-3.5 0-4-2-6.5-4.3-6.5S7.7 8 7.7 12c0 .7 0 1.3.1 1.9M5 10a7 7 0 0 1 14 0M12 20c-2.8 0-4-1.7-4.5-3"/>
-      </svg>
-      <p class="huella-estado" id="registrarEstado">Escribe el nombre y toca el botón para capturar la huella.</p>
-      <button class="btn btn-primario" id="btnRegistrarHuella" onclick="capturarHuella()">Registrar huella</button>
-      <p class="campo-ayuda">Debe hacerse en el dispositivo (celular/tablet) de la persona que va a usar su huella todos los días — la huella se guarda en ESE aparato, no en el sistema.</p>
-      <button class="btn-link" onclick="mostrarPantalla('p-lista')">Volver a la lista</button>
+      <video id="videoRegistro" autoplay playsinline muted></video>
+      <p class="rostro-estado" id="registrarEstado">Escribe el nombre y toca el botón para capturar el rostro.</p>
+      <button class="btn btn-primario" id="btnRegistrarRostro" onclick="capturarRostro()">Registrar rostro</button>
+      <p class="campo-ayuda">Debe hacerse mirando de frente a la cámara, con buena luz, en un lugar tranquilo. Esta foto NO se guarda: solo se guarda una huella digital matemática del rostro (un conjunto de números), y solo se usa para comparar cuando esta persona presione "Enviar" al registrar una actividad.</p>
+      <button class="btn-link" onclick="volverALista()">Volver a la lista</button>
     </div>
   </section>
 
 </main>
+
+<!-- face-api.js: librería de reconocimiento facial (100% en el navegador, no envía fotos a ningún servidor).
+     Debes subir el archivo "face-api.min.js" y la carpeta "models/" (7 archivos) al MISMO repositorio de GitHub,
+     junto a esta página, para que esto funcione. -->
+<script src="face-api.min.js"></script>
 
 <script>
 /* Estado en memoria (nunca localStorage): credenciales del Administrador y cuentas
@@ -145,12 +147,14 @@ var ADMIN_USUARIO = null;
 var ADMIN_PIN = null;
 var CUENTAS = [];
 var CUENTA_SELECCIONADA = null;
+var ROSTRO_MODELOS_LISTOS = false;
+var ROSTRO_STREAM = null;
 
 /* =====================================================================================
- * CONEXIÓN AL BACKEND — CORREGIDO 10 sep 2026: esta página YA NO se sirve desde
- * Apps Script (por eso la huella funciona: aquí no hay iframe de por medio). El
- * backend (Código.gs, en tu proyecto de Apps Script) ahora es una API de datos, y
- * esta página le habla con fetch() normal en vez de google.script.run.
+ * CONEXIÓN AL BACKEND — esta página se sirve fuera de Apps Script (GitHub Pages), por
+ * eso la cámara funciona sin restricciones de iframe. El backend (Escaneo.gs, en tu
+ * proyecto de Apps Script) es una API de datos y esta página le habla con fetch()
+ * normal en vez de google.script.run.
  * PEGA AQUÍ la URL de tu implementación de Apps Script (termina en /exec):
  * ===================================================================================== */
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGqD22nBUZHRI1cpIrldlm8GycqUo3k8HVYcwptYB8ll40UtHFmdRR_wcNwcV-lGOB/exec';
@@ -192,7 +196,17 @@ function conBotonCargando(btn, textoCargando, fn){
   return fn().finally(function(){ btn.disabled = false; btn.textContent = original; });
 }
 
-/* ---- Login (solo Administrador — listarCuentasHuella rechaza a cualquier otro) ---- */
+/* ---- Modelos de face-api.js (se cargan una sola vez, desde la carpeta models/) ---- */
+function cargarModelosRostro(){
+  if (ROSTRO_MODELOS_LISTOS || !window.faceapi) return Promise.resolve();
+  return Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri('models'),
+    faceapi.nets.faceLandmark68Net.loadFromUri('models'),
+    faceapi.nets.faceRecognitionNet.loadFromUri('models')
+  ]).then(function(){ ROSTRO_MODELOS_LISTOS = true; });
+}
+
+/* ---- Login (solo Administrador — listarCuentasRostro rechaza a cualquier otro) ---- */
 function hacerLogin(){
   limpiarError('errLogin');
   var usuario = document.getElementById('inUsuario').value.trim();
@@ -201,7 +215,7 @@ function hacerLogin(){
 
   var btn = document.getElementById('btnLogin');
   conBotonCargando(btn, 'Entrando...', function(){
-    return llamarServidor('listarCuentasHuella', usuario, pin).then(function(resp){
+    return llamarServidor('listarCuentasRostro', usuario, pin).then(function(resp){
       ADMIN_USUARIO = usuario;
       ADMIN_PIN = pin;
       CUENTAS = resp.cuentas || [];
@@ -214,6 +228,7 @@ function hacerLogin(){
 }
 
 function cerrarSesion(){
+  detenerCamaraRegistro();
   ADMIN_USUARIO = null; ADMIN_PIN = null; CUENTAS = []; CUENTA_SELECCIONADA = null;
   document.getElementById('btnSalir').hidden = true;
   document.getElementById('inUsuario').value = '';
@@ -223,7 +238,7 @@ function cerrarSesion(){
 /* ---- Lista de cuentas ---- */
 function cargarCuentas(){
   limpiarError('errLista');
-  llamarServidor('listarCuentasHuella', ADMIN_USUARIO, ADMIN_PIN).then(function(resp){
+  llamarServidor('listarCuentasRostro', ADMIN_USUARIO, ADMIN_PIN).then(function(resp){
     CUENTAS = resp.cuentas || [];
     pintarLista();
   }).catch(function(err){ ponerError('errLista', err); });
@@ -244,93 +259,92 @@ function pintarLista(){
     b.innerHTML =
       '<div class="info"><b>' + (c.nombreLider || c.usuario) + '</b>' +
       '<span>' + c.equipoId + ' · ' + rol + '</span></div>' +
-      '<span class="estado-huella ' + (c.tieneHuella ? 'estado-si' : 'estado-no') + '">' +
-      (c.tieneHuella ? 'Con huella' : 'Sin huella') + '</span>';
+      '<span class="estado-rostro ' + (c.tieneRostro ? 'estado-si' : 'estado-no') + '">' +
+      (c.tieneRostro ? 'Con rostro' : 'Sin rostro') + '</span>';
     cont.appendChild(b);
   });
 }
 
-/* ---- Registrar / re-registrar huella ---- */
+/* ---- Registrar / re-registrar rostro ---- */
 function abrirRegistro(cuenta){
   limpiarError('errRegistrar');
   document.getElementById('okRegistrar').hidden = true;
   CUENTA_SELECCIONADA = cuenta;
-  document.getElementById('registrarTitulo').textContent = cuenta.tieneHuella ? 'Volver a registrar huella' : 'Registrar huella';
+  document.getElementById('registrarTitulo').textContent = cuenta.tieneRostro ? 'Volver a registrar rostro' : 'Registrar rostro';
   document.getElementById('registrarSubt').textContent = cuenta.equipoId + ' · ' + (cuenta.rolDepartamento || '');
   document.getElementById('inNombreLider').value = cuenta.nombreLider || '';
-  document.getElementById('registrarEstado').textContent = 'Escribe el nombre y toca el botón para capturar la huella.';
-  document.getElementById('diagnosticoContexto').textContent =
-    'Diagnóstico — dentro de iframe: ' + (window.self !== window.top ? 'SÍ' : 'no') +
-    ' · origen: ' + location.origin +
-    ' · WebAuthn disponible: ' + (window.PublicKeyCredential ? 'sí' : 'no');
+  document.getElementById('registrarEstado').textContent = 'Cargando cámara...';
   mostrarPantalla('p-registrar');
+
+  var video = document.getElementById('videoRegistro');
+  Promise.all([
+    cargarModelosRostro(),
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+  ]).then(function(resultados){
+    ROSTRO_STREAM = resultados[1];
+    video.srcObject = ROSTRO_STREAM;
+    document.getElementById('registrarEstado').textContent = 'Escribe el nombre y toca el botón para capturar el rostro.';
+  }).catch(function(err){
+    document.getElementById('registrarEstado').textContent =
+      'No se pudo abrir la cámara (' + (err && err.message ? err.message : err) + ').';
+  });
 }
 
-function bufferABase64url(buffer){
-  var bytes = new Uint8Array(buffer);
-  var binario = '';
-  for (var i = 0; i < bytes.byteLength; i++) binario += String.fromCharCode(bytes[i]);
-  var b64 = btoa(binario);
-  return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+function detenerCamaraRegistro(){
+  if (ROSTRO_STREAM) {
+    ROSTRO_STREAM.getTracks().forEach(function(t){ t.stop(); });
+    ROSTRO_STREAM = null;
+  }
+  var video = document.getElementById('videoRegistro');
+  if (video) video.srcObject = null;
 }
 
-function capturarHuella(){
+function volverALista(){
+  detenerCamaraRegistro();
+  mostrarPantalla('p-lista');
+}
+
+function capturarRostro(){
   limpiarError('errRegistrar');
   document.getElementById('okRegistrar').hidden = true;
   var nombreLider = document.getElementById('inNombreLider').value.trim();
-  if (!nombreLider) { ponerError('errRegistrar','Escribe el nombre de quien va a usar esta huella.'); return; }
+  if (!nombreLider) { ponerError('errRegistrar','Escribe el nombre de quien va a usar este rostro.'); return; }
 
-  if (!window.PublicKeyCredential) {
-    ponerError('errRegistrar','Este navegador no soporta huella (WebAuthn). Usa el celular/tablet de la persona con Chrome o Safari actualizado.');
+  if (!window.faceapi || !ROSTRO_MODELOS_LISTOS) {
+    ponerError('errRegistrar','La librería de reconocimiento facial no cargó. Revisa que "face-api.min.js" y la carpeta "models/" estén subidos junto a esta página en GitHub.');
     return;
   }
 
   var equipoId = CUENTA_SELECCIONADA.equipoId;
+  var video = document.getElementById('videoRegistro');
   var estado = document.getElementById('registrarEstado');
-  var btn = document.getElementById('btnRegistrarHuella');
+  var btn = document.getElementById('btnRegistrarRostro');
 
-  conBotonCargando(btn, 'Capturando...', function(){
-    return llamarServidor('iniciarRegistroLider', equipoId).then(function(resp){
-      estado.textContent = 'Sigue las instrucciones del dispositivo (huella/Face ID)...';
-      var opciones = {
-        publicKey: {
-          challenge: new TextEncoder().encode(resp.challenge),
-          rp: { name: 'VUHL — Escaneo de Piso' }, // sin "id": dejamos que el navegador use el origen real de la página, en vez de adivinarlo nosotros
-          user: {
-            id: new TextEncoder().encode(equipoId),
-            name: equipoId,
-            displayName: nombreLider
-          },
-          pubKeyCredParams: [{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
-          authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
-          timeout: 60000,
-          attestation: 'none'
+  conBotonCargando(btn, 'Analizando...', function(){
+    return faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor()
+      .then(function(deteccion){
+        if (!deteccion) {
+          estado.textContent = 'No se detectó un rostro. Acércate a la cámara, mejora la luz y vuelve a intentar.';
+          return;
         }
-      };
-      return navigator.credentials.create(opciones).then(function(credencial){
-        var pubKeyBuf = (credencial.response.getPublicKey && credencial.response.getPublicKey()) || null;
-        return llamarServidor('registrarLiderEquipo', {
+        var descriptor = Array.prototype.slice.call(deteccion.descriptor);
+        estado.textContent = 'Rostro detectado. Guardando...';
+        return llamarServidor('registrarRostro', {
           equipoId: equipoId,
           nombreLider: nombreLider,
-          credencial: {
-            credentialId: credencial.id,
-            publicKeyCoseB64: pubKeyBuf ? bufferABase64url(pubKeyBuf) : '',
-            challenge: resp.challenge
-          },
+          descriptor: descriptor,
           idUsuarioAdmin: ADMIN_USUARIO,
           pinAdmin: ADMIN_PIN
+        }).then(function(){
+          document.getElementById('okRegistrar').hidden = false;
+          document.getElementById('okRegistrar').textContent = 'Rostro registrado para ' + nombreLider + ' (' + equipoId + ').';
+          estado.textContent = 'Listo. Puedes volver a la lista o registrar otro rostro.';
+          cargarCuentas();
         });
-      }).then(function(){
-        document.getElementById('okRegistrar').hidden = false;
-        document.getElementById('okRegistrar').textContent = 'Huella registrada para ' + nombreLider + ' (' + equipoId + ').';
-        estado.textContent = 'Listo. Puedes volver a la lista o registrar otra huella en este mismo dispositivo.';
-        cargarCuentas();
-      }).catch(function(errWebauthn){
-        ponerError('errRegistrar', 'No se pudo capturar la huella (' +
-          (errWebauthn && errWebauthn.name ? errWebauthn.name : 'error') + '). Vuelve a intentar en este mismo dispositivo.');
       });
-    }).catch(function(err){ ponerError('errRegistrar', err); });
-  });
+  }).catch(function(err){ ponerError('errRegistrar', err); });
 }
 
 /* ---- Arranque ---- */
