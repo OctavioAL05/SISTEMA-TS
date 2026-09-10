@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Escaneo de Piso</title>
+  <style>
+    :root{
+      --azul:#2563eb; --azul-oscuro:#1d4ed8; --navy:#0f172a; --rojo:#dc2626; --rojo-oscuro:#b91c1c;
+      --verde:#16a34a; --ambar:#d97706; --gris:#64748b; --gris-claro:#94a3b8;
+      --fondo:#f1f5f9; --borde:#e2e8f0; --texto:#0f172a;
+    }
+    *{box-sizing:border-box;}
+    html,body{margin:0;padding:0;background:var(--fondo);color:var(--texto);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+    body{min-height:100vh;display:flex;flex-direction:column;}
+
+    header{background:var(--navy);color:#fff;padding:14px 18px;display:flex;align-items:center;
+      justify-content:space-between;position:sticky;top:0;z-index:20;}
+    header .marca{display:flex;flex-direction:column;line-height:1.15;}
+    header .marca b{font-size:15px;letter-spacing:.03em;}
+    header .marca span{font-size:11px;color:#94a3b8;}
+    header .sesion-info{font-size:12px;color:#cbd5e1;text-align:right;}
+    header .sesion-info b{color:#fff;display:block;font-size:13px;}
+    #btnSalir{background:transparent;border:1px solid #334155;color:#e2e8f0;border-radius:8px;
+      padding:8px 12px;font-size:12px;margin-left:10px;cursor:pointer;}
+    #btnSalir[hidden]{display:none;}
+
+    main{flex:1;display:flex;flex-direction:column;align-items:center;padding:18px 14px 40px;}
+    .tarjeta{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.06);
+      width:100%;max-width:480px;padding:22px 20px;}
+    .pantalla{width:100%;max-width:480px;}
+    .pantalla[hidden]{display:none;}
+
+    h1{font-size:19px;margin:0 0 4px;}
+    h2{font-size:16px;margin:0 0 14px;color:var(--texto);}
+    .subt{color:var(--gris);font-size:13px;margin:0 0 18px;}
+
+    label{display:block;font-size:12.5px;font-weight:600;color:#334155;margin:14px 0 6px;}
+    label:first-of-type{margin-top:0;}
+    input[type=text],input[type=number],input[type=password],select,textarea{
+      width:100%;padding:13px 12px;border:1.5px solid var(--borde);border-radius:10px;
+      font-size:16px;background:#fff;color:var(--texto);font-family:inherit;}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--azul);}
+    textarea{min-height:80px;resize:vertical;}
+    .campo-folio{font-size:22px;text-align:center;letter-spacing:.02em;font-weight:600;}
+
+    .btn{display:block;width:100%;padding:15px 16px;border:none;border-radius:11px;
+      font-size:15.5px;font-weight:600;cursor:pointer;margin-top:14px;text-align:center;}
+    .btn-primario{background:var(--azul);color:#fff;}
+    .btn-primario:active{background:var(--azul-oscuro);}
+    .btn-secundario{background:#fff;color:var(--azul);border:1.5px solid var(--azul);}
+    .btn-peligro{background:var(--rojo);color:#fff;}
+    .btn-peligro:active{background:var(--rojo-oscuro);}
+    .btn-ambar{background:var(--ambar);color:#fff;}
+    .btn-fantasma{background:transparent;color:var(--gris);border:1.5px dashed var(--borde);}
+    .btn[disabled]{opacity:.55;pointer-events:none;}
+    .btn-link{background:none;border:none;color:var(--azul);font-size:13px;cursor:pointer;
+      padding:8px 0;text-decoration:underline;display:block;margin:6px auto 0;}
+
+    .banner-error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13.5px;
+      padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.4;}
+    .banner-error[hidden]{display:none;}
+    .banner-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:13.5px;
+      padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.4;}
+    .banner-ok[hidden]{display:none;}
+
+    .stepper{display:flex;align-items:center;gap:6px;margin-bottom:18px;}
+    .stepper .paso{flex:1;height:5px;border-radius:3px;background:var(--borde);}
+    .stepper .paso.activo{background:var(--azul);}
+    .stepper .paso.hecho{background:var(--verde);}
+    .stepper-etiquetas{display:flex;justify-content:space-between;font-size:10.5px;
+      color:var(--gris);margin:-12px 0 16px;text-transform:uppercase;letter-spacing:.03em;}
+
+    .campo-check{display:flex;align-items:flex-start;gap:11px;padding:13px 4px;
+      border-bottom:1px solid var(--borde);}
+    .campo-check:last-child{border-bottom:none;}
+    .campo-check input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--azul);}
+    .campo-check span{font-size:14.5px;line-height:1.35;padding-top:1px;}
+    .checklist-vacio{color:var(--gris);font-size:13.5px;font-style:italic;padding:6px 0 2px;}
+
+    .pieza-resumen{background:var(--fondo);border-radius:10px;padding:12px 14px;margin-bottom:16px;
+      font-size:13.5px;color:#334155;}
+    .pieza-resumen b{color:var(--texto);}
+    .pieza-resumen .folio-grande{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+
+    .menu-lista .btn{margin-top:10px;}
+    .menu-lista .btn:first-child{margin-top:0;}
+
+    .huella-icono{width:64px;height:64px;margin:6px auto 14px;display:block;}
+    .huella-estado{text-align:center;font-size:13.5px;color:var(--gris);margin-bottom:6px;}
+
+    .toggle-grupo{display:flex;gap:8px;margin:6px 0 4px;}
+    .toggle-grupo button{flex:1;padding:11px;border-radius:9px;border:1.5px solid var(--borde);
+      background:#fff;font-size:14px;font-weight:600;color:var(--gris);cursor:pointer;}
+    .toggle-grupo button.sel-si{border-color:var(--rojo);color:var(--rojo);background:#fef2f2;}
+    .toggle-grupo button.sel-no{border-color:var(--verde);color:var(--verde);background:#f0fdf4;}
+
+    .oculto{display:none !important;}
+    .spinner{display:inline-block;width:15px;height:15px;border:2px solid rgba(255,255,255,.5);
+      border-top-color:#fff;border-radius:50%;animation:girar .7s linear infinite;vertical-align:-3px;margin-right:7px;}
+    @keyframes girar{to{transform:rotate(360deg);}}
+
+    .exito-check{width:72px;height:72px;border-radius:50%;background:#f0fdf4;border:2px solid var(--verde);
+      display:flex;align-items:center;justify-content:center;margin:8px auto 16px;font-size:34px;color:var(--verde);}
+    .centrado{text-align:center;}
+    .campo-ayuda{font-size:11.5px;color:var(--gris-claro);margin-top:4px;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="marca"><b>VUHL — ESCANEO DE PISO</b><span id="lblDeptoHeader">Sin sesión</span></div>
+  <div style="display:flex;align-items:center;">
+    <div class="sesion-info" id="infoSesion"></div>
+    <button id="btnSalir" hidden onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===================== PANTALLA: LOGIN ===================== -->
+  <section id="p-login" class="pantalla">
+    <div class="tarjeta">
+      <h1>Iniciar sesión</h1>
+      <p class="subt" id="loginSubt">Escribe tu usuario para continuar.</p>
+      <div class="banner-error" id="errLogin" hidden></div>
+
+      <div id="bloqueLoginUsuario">
+        <label>Usuario</label>
+        <input type="text" id="inLoginUsuario" autocomplete="username" placeholder="equipo@dominio.com o tu usuario"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();continuarLogin();}">
+        <button class="btn btn-primario" id="btnContinuarLogin" onclick="continuarLogin()">Continuar</button>
+      </div>
+
+      <div id="bloqueLoginPin" class="oculto">
+        <label>PIN</label>
+        <input type="password" id="inLoginPin" inputmode="numeric" maxlength="4" placeholder="••••"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();hacerLoginPin();}">
+        <button class="btn btn-primario" id="btnLogin" onclick="hacerLoginPin()">Entrar</button>
+        <button class="btn-link" onclick="cambiarUsuarioLogin()">Cambiar de usuario</button>
+      </div>
+
+      <div id="bloqueLoginHuella" class="oculto">
+        <svg class="huella-icono" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5">
+          <path d="M12 11c0 3-1 5-1 7M8 12c0-3 1.6-5 4-5s4 2 4 5c0 1-.1 2-.3 3M16 15.5c.2-1 .3-2 .3-3.5 0-4-2-6.5-4.3-6.5S7.7 8 7.7 12c0 .7 0 1.3.1 1.9M5 10a7 7 0 0 1 14 0M12 20c-2.8 0-4-1.7-4.5-3"/>
+        </svg>
+        <p class="huella-estado" id="loginHuellaEstado">Toca el botón para autenticar con tu huella.</p>
+        <button class="btn btn-primario" id="btnLoginHuella" onclick="hacerLoginHuella()">Autenticar con huella</button>
+        <p class="campo-ayuda">¿Tu huella falla? Pide al Administrador que haga esta acción desde su propia cuenta.</p>
+        <button class="btn-link" onclick="cambiarUsuarioLogin()">Cambiar de usuario</button>
+      </div>
+
+      <button class="btn-link" onclick="mostrarPantalla('p-reset-pin')">¿Necesitas dar de alta o resetear un PIN?</button>
+    </div>
+  </section>
+
+  <!-- ============== PANTALLA: ALTA / RESET DE PIN (desde login) ============== -->
+  <section id="p-reset-pin" class="pantalla">
+    <div class="tarjeta">
+      <h1>Alta / reseteo de PIN</h1>
+      <p class="subt">Da de alta o resetea el PIN de un usuario o equipo.</p>
+      <div class="banner-error" id="errReset" hidden></div>
+      <div class="banner-ok" id="okReset" hidden></div>
+
+      <label>Usuario a dar de alta / resetear</label>
+      <input type="text" id="inResetObjetivo" placeholder="equipo@dominio.com">
+      <label>Nuevo PIN (4 dígitos)</label>
+      <input type="password" id="inResetNuevoPin" inputmode="numeric" maxlength="4" placeholder="••••">
+
+      <p class="campo-ayuda">Esto es solo para PIN de técnicos o del Administrador. Las huellas de líderes,
+        Supervisores y Calidad se registran aparte (pídelo al Administrador).</p>
+
+      <div class="toggle-grupo" style="margin-top:16px;">
+        <button type="button" id="btnModoAdmin" class="sel-si" onclick="elegirModoReset('admin')">Autorizar con el Administrador</button>
+        <button type="button" id="btnModoMaestra" onclick="elegirModoReset('maestra')">Clave maestra (1a vez)</button>
+      </div>
+
+      <div id="bloqueResetAdmin">
+        <label>Usuario del Administrador que autoriza</label>
+        <input type="text" id="inResetAdminUsuario" placeholder="admin@dominio.com">
+        <label>PIN del Administrador</label>
+        <input type="password" id="inResetAdminPin" inputmode="numeric" maxlength="4" placeholder="••••">
+      </div>
+      <div id="bloqueResetMaestra" class="oculto">
+        <label>Clave maestra de arranque</label>
+        <input type="password" id="inResetClaveMaestra" placeholder="Clave configurada en Propiedades del script">
+        <p class="campo-ayuda">Solo funciona la primera vez, antes de que el Administrador tenga PIN configurado.</p>
+      </div>
+
+      <button class="btn btn-primario" id="btnGuardarReset" onclick="guardarResetPin()">Guardar PIN</button>
+      <button class="btn-link" onclick="mostrarPantalla('p-login')">Volver a iniciar sesión</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: MENÚ ===================== -->
+  <section id="p-menu" class="pantalla">
+    <div class="tarjeta">
+      <h1 id="menuTitulo">Menú</h1>
+      <p class="subt" id="menuSubt"></p>
+      <div class="menu-lista" id="menuLista"></div>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: ESCANEAR FOLIO ===================== -->
+  <section id="p-escaneo" class="pantalla">
+    <div class="tarjeta">
+      <h1 id="escaneoTitulo">Escanear pieza</h1>
+      <p class="subt" id="escaneoSubt">Escanea el código o escribe el folio.</p>
+      <div class="banner-error" id="errEscaneo" hidden></div>
+      <label>Folio</label>
+      <input type="text" class="campo-folio" id="inFolio" placeholder="FOLIO" autofocus
+        onkeydown="if(event.key==='Enter'){event.preventDefault();escanearFolio();}">
+      <p class="campo-ayuda">Si usas una pistola lectora, solo enfoca este campo y escanea — el Enter se envía solo.</p>
+      <button class="btn btn-primario" id="btnEscanear" onclick="escanearFolio()">Continuar</button>
+      <button class="btn-link" onclick="volverAlMenu()">Volver al menú</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: BITÁCORA (paso 1) ===================== -->
+  <section id="p-bitacora" class="pantalla">
+    <div class="tarjeta">
+      <div class="stepper"><div class="paso activo"></div><div class="paso"></div><div class="paso"></div></div>
+      <div class="stepper-etiquetas"><span>Bitácora</span><span>Liberación</span><span>Formulario</span></div>
+      <div class="pieza-resumen" id="resumenBitacora"></div>
+      <div class="banner-error" id="errBitacora" hidden></div>
+      <h2>Bitácora — <span id="etapaBitacoraNombre"></span></h2>
+      <div id="camposBitacoraCont"></div>
+      <p class="campo-ayuda" id="notaBitacoraVacia" hidden>Esta etapa todavía no tiene campos de bitácora configurados.</p>
+      <button class="btn btn-primario" id="btnBitacoraSiguiente" onclick="guardarPasoBitacora()">Siguiente</button>
+      <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ============ PANTALLA: LIBERACIÓN — CHECKLIST + HUELLA/PIN (paso 2) ============ -->
+  <section id="p-liberacion" class="pantalla">
+    <div class="tarjeta">
+      <div class="stepper"><div class="paso hecho"></div><div class="paso activo"></div><div class="paso"></div></div>
+      <div class="stepper-etiquetas"><span>Bitácora</span><span>Liberación</span><span>Formulario</span></div>
+      <div class="pieza-resumen" id="resumenLiberacion"></div>
+      <div class="banner-error" id="errLiberacion" hidden></div>
+
+      <div id="bloqueChecklist">
+        <h2>Revisión del líder</h2>
+        <div id="checklistCont"></div>
+        <p class="checklist-vacio" id="checklistVacioMsg" hidden>Sin puntos de revisión configurados para esta etapa.</p>
+      </div>
+
+      <div id="bloqueHuella" class="oculto" style="margin-top:8px;">
+        <h2>Autenticación del líder</h2>
+        <svg class="huella-icono" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5">
+          <path d="M12 11c0 3-1 5-1 7M8 12c0-3 1.6-5 4-5s4 2 4 5c0 1-.1 2-.3 3M16 15.5c.2-1 .3-2 .3-3.5 0-4-2-6.5-4.3-6.5S7.7 8 7.7 12c0 .7 0 1.3.1 1.9M5 10a7 7 0 0 1 14 0M12 20c-2.8 0-4-1.7-4.5-3"/>
+        </svg>
+        <p class="huella-estado" id="huellaEstado">Toca el botón para autenticar con huella.</p>
+        <button class="btn btn-primario" id="btnHuella" onclick="intentarHuella()">Autenticar con huella</button>
+        <button class="btn-link" onclick="mostrarFallbackPin()">La huella no funciona / respaldo del Administrador</button>
+
+        <div id="bloqueFallbackPin" class="oculto" style="margin-top:6px;">
+          <label>Usuario del Administrador</label>
+          <input type="text" id="inFallbackUsuario" placeholder="admin@dominio.com">
+          <label>PIN del Administrador</label>
+          <input type="password" id="inFallbackPin" inputmode="numeric" maxlength="4" placeholder="••••">
+          <button class="btn btn-ambar" onclick="autenticarConPinRespaldo()">Autenticar con PIN</button>
+        </div>
+      </div>
+
+      <button class="btn btn-secundario" id="btnIrAHuella" onclick="continuarAHuella()">Continuar a autenticación</button>
+      <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: FORMULARIO (paso 3) ===================== -->
+  <section id="p-formulario" class="pantalla">
+    <div class="tarjeta">
+      <div class="stepper"><div class="paso hecho"></div><div class="paso hecho"></div><div class="paso activo"></div></div>
+      <div class="stepper-etiquetas"><span>Bitácora</span><span>Liberación</span><span>Formulario</span></div>
+      <div class="pieza-resumen" id="resumenFormulario"></div>
+      <div class="banner-error" id="errFormulario" hidden></div>
+      <h2>Formulario — <span id="etapaFormularioNombre"></span></h2>
+
+      <div id="hallazgoToggleCont" class="oculto">
+        <label>¿Se encontró un hallazgo en esta pieza?</label>
+        <div class="toggle-grupo">
+          <button type="button" id="btnHallazgoNo" class="sel-no" onclick="elegirHallazgo(false)">No</button>
+          <button type="button" id="btnHallazgoSi" onclick="elegirHallazgo(true)">Sí</button>
+        </div>
+      </div>
+
+      <div id="camposFormularioCont"></div>
+      <p class="campo-ayuda" id="notaFormularioVacia" hidden>Esta etapa no tiene preguntas adicionales de formulario.</p>
+      <button class="btn btn-primario" id="btnGuardarFormulario" onclick="guardarFormularioFinal()">Guardar</button>
+      <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: ÉXITO ===================== -->
+  <section id="p-exito" class="pantalla">
+    <div class="tarjeta centrado">
+      <div class="exito-check">✓</div>
+      <h1 id="exitoTitulo">Listo</h1>
+      <p class="subt" id="exitoTexto"></p>
+      <button class="btn btn-primario" onclick="volverAEscanearOtra()">Escanear otra pieza</button>
+      <button class="btn-link" onclick="volverAlMenu()">Ir al menú</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: MARCAR HOLD ===================== -->
+  <section id="p-hold" class="pantalla">
+    <div class="tarjeta">
+      <h1>Marcar HOLD</h1>
+      <div class="banner-error" id="errHold" hidden></div>
+      <label>Folio</label>
+      <input type="text" class="campo-folio" id="inFolioHold" placeholder="FOLIO">
+      <label>Motivo</label>
+      <textarea id="inMotivoHold" placeholder="Describe el motivo del HOLD"></textarea>
+      <button class="btn btn-peligro" onclick="confirmarMarcarHold()">Poner en HOLD</button>
+      <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: LIBERAR HOLD ===================== -->
+  <section id="p-resolver-hold" class="pantalla">
+    <div class="tarjeta">
+      <h1>Liberar HOLD</h1>
+      <div class="banner-error" id="errResolverHold" hidden></div>
+      <div id="bloqueBuscarHold">
+        <label>Folio</label>
+        <input type="text" class="campo-folio" id="inFolioResolverHold" placeholder="FOLIO">
+        <button class="btn btn-primario" onclick="buscarPiezaHold()">Buscar</button>
+      </div>
+      <div id="bloqueResolverHold" class="oculto">
+        <div class="pieza-resumen" id="resumenResolverHold"></div>
+        <label>Nueva disposición</label>
+        <select id="inNuevaDisposicion">
+          <option value="">Selecciona...</option>
+          <option>APROBADA</option>
+          <option>APROBADA CON DESVIACION</option>
+          <option>RETRABAJO</option>
+          <option>SCRAP</option>
+        </select>
+        <label>Comentario</label>
+        <textarea id="inComentarioResolverHold" placeholder="Comentario de la resolución"></textarea>
+        <button class="btn btn-primario" onclick="confirmarResolverHold()">Liberar HOLD</button>
+      </div>
+      <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+/* =====================================================================================
+ * ESTADO GLOBAL EN MEMORIA (nunca localStorage/sessionStorage: PIN y sesión viven solo
+ * en esta variable JS mientras la pestaña está abierta; se pierden al cerrar/recargar,
+ * lo cual es intencional para un equipo compartido en una tablet de piso).
+ * ===================================================================================== */
+var SESION = null;            // { usuario, equipoId, esAdmin, esCoordinador, rolDepartamento, nombreLider }
+var USUARIO_LOGIN_EN_CURSO = null; // usuario ya escrito en el paso 1 del login, mientras se resuelve PIN o huella
+var CONTEXTO = null;          // { modo: 'team'|'inspeccion'|'programada'|'hold'|'resolverHold', departamento }
+var ESCANEO_ACTUAL = null;    // respuesta de iniciarEscaneo (folio, pieza, requiereAdmin, camposBitacora, checklistLider, camposFormulario)
+var VALORES_BITACORA = {};
+var VALORES_CHECKLIST = {};
+var VALORES_FORMULARIO = {};
+var TICKET_LIBERACION = null;
+var HALLAZGO_CLAVES = ['HALLAZGO_UBICACION','INCIDENCIAS_DOCUMENTACION','INCIDENCIAS_PRODUCTO','UBICACION_PROBLEMA'];
+var PIEZA_HOLD_ACTUAL = null;
+
+/* =====================================================================================
+ * CONEXIÓN AL BACKEND — CORREGIDO 10 sep 2026: esta página YA NO se sirve desde
+ * Apps Script (por eso la huella funciona: aquí no hay iframe de por medio). El
+ * backend (Código.gs, en tu proyecto de Apps Script) ahora es una API de datos, y
+ * esta página le habla con fetch() normal en vez de google.script.run.
+ * PEGA AQUÍ la URL de tu implementación de Apps Script (termina en /exec):
+ * ===================================================================================== */
+var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGqD22nBUZHRI1cpIrldlm8GycqUo3k8HVYcwptYB8ll40UtHFmdRR_wcNwcV-lGOB/exec';
+
+function llamarServidor(nombreFn){
+  var args = Array.prototype.slice.call(arguments, 1);
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    // text/plain a propósito: evita que el navegador mande un preflight OPTIONS
+    // (Apps Script no lo responde bien). El body sigue siendo JSON normal.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ fn: nombreFn, args: args })
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(resp){
+      if (resp && resp.ok === false) { throw new Error(resp.error || 'Error desconocido.'); }
+      return resp;
+    })
+    .catch(function(err){
+      throw (err && err.message) ? err.message : String(err);
+    });
+}
+
+function mostrarPantalla(id){
+  document.querySelectorAll('.pantalla').forEach(function(el){ el.hidden = true; });
+  document.getElementById(id).hidden = false;
+  window.scrollTo(0,0);
+}
+
+function ponerError(idBanner, mensaje){
+  var el = document.getElementById(idBanner);
+  el.textContent = mensaje;
+  el.hidden = false;
+}
+function limpiarError(idBanner){
+  var el = document.getElementById(idBanner);
+  el.hidden = true; el.textContent = '';
+}
+
+function conBotonCargando(btn, textoCargando, fn){
+  var original = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + textoCargando;
+  return fn().finally(function(){
+    btn.disabled = false;
+    btn.textContent = original;
+  });
+}
+
+/* =====================================================================================
+ * LOGIN — paso 1 decide el método (PIN o HUELLA) según la cuenta escrita; ver
+ * iniciarSesion/metodoLoginParaFila_ en el backend. Técnicos y Administrador usan
+ * PIN; Supervisores y Calidad usan su huella (no tienen PIN).
+ * ===================================================================================== */
+function mostrarBloqueLogin(bloque){
+  ['bloqueLoginUsuario','bloqueLoginPin','bloqueLoginHuella'].forEach(function(id){
+    document.getElementById(id).className = (id === bloque) ? '' : 'oculto';
+  });
+}
+
+function cambiarUsuarioLogin(){
+  limpiarError('errLogin');
+  USUARIO_LOGIN_EN_CURSO = null;
+  document.getElementById('inLoginPin').value = '';
+  document.getElementById('loginSubt').textContent = 'Escribe tu usuario para continuar.';
+  mostrarBloqueLogin('bloqueLoginUsuario');
+  setTimeout(function(){ document.getElementById('inLoginUsuario').focus(); }, 50);
+}
+
+function continuarLogin(){
+  limpiarError('errLogin');
+  var usuario = document.getElementById('inLoginUsuario').value.trim();
+  if (!usuario) { ponerError('errLogin','Escribe tu usuario.'); return; }
+
+  var btn = document.getElementById('btnContinuarLogin');
+  conBotonCargando(btn, 'Verificando...', function(){
+    return llamarServidor('iniciarSesion', usuario).then(function(resp){
+      USUARIO_LOGIN_EN_CURSO = usuario;
+      if (resp.metodo === 'PIN') {
+        document.getElementById('loginSubt').textContent = 'Escribe tu PIN.';
+        mostrarBloqueLogin('bloqueLoginPin');
+        setTimeout(function(){ document.getElementById('inLoginPin').focus(); }, 50);
+        return;
+      }
+      // HUELLA (Supervisor/Calidad)
+      document.getElementById('loginSubt').textContent = 'Autenticación por huella.';
+      document.getElementById('loginHuellaEstado').textContent = 'Toca el botón para autenticar con tu huella.';
+      mostrarBloqueLogin('bloqueLoginHuella');
+      if (!resp.tieneCredencial) {
+        document.getElementById('loginHuellaEstado').textContent =
+          'Esta cuenta todavía no tiene huella registrada. Pide al Administrador que la registre.';
+      }
+    }).catch(function(err){ ponerError('errLogin', err); });
+  });
+}
+
+function hacerLoginPin(){
+  limpiarError('errLogin');
+  var usuario = USUARIO_LOGIN_EN_CURSO;
+  var pin = document.getElementById('inLoginPin').value.trim();
+  if (!pin) { ponerError('errLogin','Escribe tu PIN.'); return; }
+
+  var btn = document.getElementById('btnLogin');
+  conBotonCargando(btn, 'Entrando...', function(){
+    return llamarServidor('verificarPIN', usuario, pin).then(function(resp){
+      SESION = resp;
+      document.getElementById('inLoginUsuario').value = '';
+      document.getElementById('inLoginPin').value = '';
+      USUARIO_LOGIN_EN_CURSO = null;
+      actualizarHeaderSesion();
+      irAMenu();
+    }).catch(function(err){ ponerError('errLogin', err); });
+  });
+}
+
+function hacerLoginHuella(){
+  limpiarError('errLogin');
+  var usuario = USUARIO_LOGIN_EN_CURSO;
+  var btn = document.getElementById('btnLoginHuella');
+  var estado = document.getElementById('loginHuellaEstado');
+
+  if (!window.PublicKeyCredential) {
+    estado.textContent = 'Este navegador no soporta huella (WebAuthn). Pide al Administrador que haga esta acción.';
+    return;
+  }
+
+  conBotonCargando(btn, 'Verificando...', function(){
+    return llamarServidor('iniciarSesion', usuario).then(function(resp){
+      if (!resp.tieneCredencial) {
+        estado.textContent = 'Esta cuenta todavía no tiene huella registrada. Pide al Administrador que la registre.';
+        return Promise.resolve();
+      }
+      var challengeBytes = new TextEncoder().encode(resp.challenge);
+      var opciones = {
+        publicKey: {
+          challenge: challengeBytes,
+          // sin "rpId": el navegador usa el origen real de la página, igual que al
+          // crear la credencial (ver Index_Huellas.html) — no lo adivinamos nosotros.
+          allowCredentials: [{ id: base64urlABuffer(resp.credentialId), type: 'public-key' }],
+          userVerification: 'required',
+          timeout: 45000
+        }
+      };
+      return navigator.credentials.get(opciones).then(function(credencial){
+        var asercion = { credentialId: credencial.id, challenge: resp.challenge };
+        return llamarServidor('verificarSesionHuella', usuario, asercion);
+      }).then(function(resp2){
+        SESION = resp2;
+        document.getElementById('inLoginUsuario').value = '';
+        USUARIO_LOGIN_EN_CURSO = null;
+        actualizarHeaderSesion();
+        irAMenu();
+      }).catch(function(errWebauthn){
+        estado.textContent = 'No se pudo leer la huella (' + (errWebauthn && errWebauthn.name ? errWebauthn.name : 'error') +
+          '). Pide al Administrador que haga esta acción desde su propia cuenta.';
+      });
+    }).catch(function(err){ ponerError('errLogin', err); });
+  });
+}
+
+function actualizarHeaderSesion(){
+  var lbl = document.getElementById('lblDeptoHeader');
+  var info = document.getElementById('infoSesion');
+  var btnSalir = document.getElementById('btnSalir');
+  if (!SESION){ lbl.textContent = 'Sin sesión'; info.textContent=''; btnSalir.hidden = true; return; }
+  lbl.textContent = SESION.esCoordinador ? 'Administrador' : (SESION.esAdmin ? 'Supervisor / Calidad' : (SESION.rolDepartamento || ''));
+  info.innerHTML = '<b>' + SESION.usuario + '</b>' + (SESION.equipoId ? SESION.equipoId : '');
+  btnSalir.hidden = false;
+}
+
+function cerrarSesion(){
+  SESION = null; USUARIO_LOGIN_EN_CURSO = null; CONTEXTO = null; ESCANEO_ACTUAL = null;
+  cambiarUsuarioLogin();
+  actualizarHeaderSesion();
+  mostrarPantalla('p-login');
+}
+
+/* =====================================================================================
+ * ALTA / RESET DE PIN
+ * ===================================================================================== */
+function elegirModoReset(modo){
+  document.getElementById('btnModoAdmin').className = modo==='admin' ? 'sel-si' : '';
+  document.getElementById('btnModoMaestra').className = modo==='maestra' ? 'sel-si' : '';
+  document.getElementById('bloqueResetAdmin').className = modo==='admin' ? '' : 'oculto';
+  document.getElementById('bloqueResetMaestra').className = modo==='maestra' ? '' : 'oculto';
+}
+
+function guardarResetPin(){
+  limpiarError('errReset'); document.getElementById('okReset').hidden = true;
+  var payload = {
+    usuarioObjetivo: document.getElementById('inResetObjetivo').value.trim(),
+    nuevoPin: document.getElementById('inResetNuevoPin').value.trim()
+  };
+  var modoMaestra = document.getElementById('bloqueResetMaestra').className.indexOf('oculto') === -1;
+  if (modoMaestra) {
+    payload.claveMaestra = document.getElementById('inResetClaveMaestra').value.trim();
+  } else {
+    payload.idUsuarioAdmin = document.getElementById('inResetAdminUsuario').value.trim();
+    payload.pinAdmin = document.getElementById('inResetAdminPin').value.trim();
+  }
+  if (!payload.usuarioObjetivo || !payload.nuevoPin) { ponerError('errReset','Completa usuario y nuevo PIN.'); return; }
+
+  var btn = document.getElementById('btnGuardarReset');
+  conBotonCargando(btn, 'Guardando...', function(){
+    return llamarServidor('altaOResetPin', payload).then(function(resp){
+      document.getElementById('okReset').hidden = false;
+      document.getElementById('okReset').textContent = 'PIN actualizado para ' + resp.usuario + '.';
+      document.getElementById('inResetObjetivo').value = '';
+      document.getElementById('inResetNuevoPin').value = '';
+    }).catch(function(err){ ponerError('errReset', err); });
+  });
+}
+
+/* =====================================================================================
+ * MENÚ (distinto para equipo de piso vs Supervisor/Calidad)
+ * ===================================================================================== */
+function irAMenu(){
+  var titulo = document.getElementById('menuTitulo');
+  var subt = document.getElementById('menuSubt');
+  var lista = document.getElementById('menuLista');
+  lista.innerHTML = '';
+
+  if (!SESION.esAdmin){
+    titulo.textContent = SESION.rolDepartamento || 'Tu equipo';
+    subt.textContent = 'Escanea la siguiente pieza para continuar.';
+    lista.appendChild(botonMenu('Escanear pieza', function(){
+      CONTEXTO = { modo:'team', departamento: SESION.rolDepartamento };
+      irAEscanear('Escanear pieza — ' + SESION.rolDepartamento);
+    }));
+  } else {
+    titulo.textContent = 'Supervisor / Calidad';
+    subt.textContent = SESION.usuario;
+    lista.appendChild(botonMenu('Entregar piezas a producción', function(){
+      CONTEXTO = { modo:'programada' };
+      irAEscanear('Entregar a producción (PROGRAMADA)');
+    }));
+    lista.appendChild(botonMenu('Inspección de Supervisor', function(){
+      CONTEXTO = { modo:'inspeccion', departamento:'INSPECCION SUPERVISOR' };
+      irAEscanear('Inspección de Supervisor');
+    }));
+    lista.appendChild(botonMenu('Inspección de Calidad', function(){
+      CONTEXTO = { modo:'inspeccion', departamento:'INSPECCION CALIDAD' };
+      irAEscanear('Inspección de Calidad');
+    }));
+    lista.appendChild(botonMenu('Marcar HOLD', function(){
+      document.getElementById('inFolioHold').value = '';
+      document.getElementById('inMotivoHold').value = '';
+      limpiarError('errHold');
+      mostrarPantalla('p-hold');
+    }, 'btn-peligro'));
+    lista.appendChild(botonMenu('Liberar HOLD', function(){
+      document.getElementById('inFolioResolverHold').value = '';
+      document.getElementById('bloqueResolverHold').className = 'oculto';
+      document.getElementById('bloqueBuscarHold').className = '';
+      limpiarError('errResolverHold');
+      mostrarPantalla('p-resolver-hold');
+    }, 'btn-ambar'));
+  }
+  mostrarPantalla('p-menu');
+}
+
+function botonMenu(texto, onClick, clase){
+  var b = document.createElement('button');
+  b.className = 'btn ' + (clase || 'btn-primario');
+  b.textContent = texto;
+  b.onclick = onClick;
+  return b;
+}
+
+function volverAlMenu(){
+  ESCANEO_ACTUAL = null; VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; TICKET_LIBERACION = null;
+  irAMenu();
+}
+
+/* =====================================================================================
+ * ESCANEO DE FOLIO (punto de entrada común, se ramifica según CONTEXTO.modo)
+ * ===================================================================================== */
+function irAEscanear(titulo){
+  document.getElementById('escaneoTitulo').textContent = titulo;
+  document.getElementById('inFolio').value = '';
+  limpiarError('errEscaneo');
+  mostrarPantalla('p-escaneo');
+  setTimeout(function(){ document.getElementById('inFolio').focus(); }, 50);
+}
+
+function escanearFolio(){
+  limpiarError('errEscaneo');
+  var folio = document.getElementById('inFolio').value.trim();
+  if (!folio) { ponerError('errEscaneo','Escanea o escribe un folio.'); return; }
+
+  var btn = document.getElementById('btnEscanear');
+  if (CONTEXTO.modo === 'programada') {
+    conBotonCargando(btn, 'Registrando...', function(){
+      return llamarServidor('registrarEntregaProgramada', folio, SESION.usuario).then(function(resp){
+        mostrarExito('Entrega registrada', resp.yaProgramada
+          ? 'Este folio ya estaba registrado como PROGRAMADA.'
+          : 'Folio ' + folio + ' marcado como PROGRAMADA.');
+      }).catch(function(err){ ponerError('errEscaneo', err); });
+    });
+    return;
+  }
+
+  // modo 'team' o 'inspeccion': arranca el flujo de 3 pasos
+  conBotonCargando(btn, 'Buscando...', function(){
+    return llamarServidor('iniciarEscaneo', folio, CONTEXTO.departamento).then(function(resp){
+      ESCANEO_ACTUAL = resp;
+      VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; TICKET_LIBERACION = null;
+      abrirPasoBitacora();
+    }).catch(function(err){ ponerError('errEscaneo', err); });
+  });
+}
+
+function resumenPiezaHtml(){
+  var p = ESCANEO_ACTUAL.pieza;
+  return '<div class="folio-grande">' + ESCANEO_ACTUAL.folio + '</div>' +
+    'WOINT: <b>' + (p.woint||'—') + '</b> &nbsp;·&nbsp; JOB: <b>' + (p.job||'—') + '</b><br>' +
+    'Estatus actual: <b>' + (p.estatusActual||'—') + '</b>';
+}
+
+/* =====================================================================================
+ * PASO 1 — BITÁCORA
+ * ===================================================================================== */
+function abrirPasoBitacora(){
+  document.getElementById('resumenBitacora').innerHTML = resumenPiezaHtml();
+  document.getElementById('etapaBitacoraNombre').textContent = CONTEXTO.departamento;
+  limpiarError('errBitacora');
+  var cont = document.getElementById('camposBitacoraCont');
+  cont.innerHTML = '';
+  var campos = ESCANEO_ACTUAL.camposBitacora || [];
+  document.getElementById('notaBitacoraVacia').hidden = campos.length > 0;
+  campos.forEach(function(campo){ cont.appendChild(renderizarCampo(campo, VALORES_BITACORA)); });
+  mostrarPantalla('p-bitacora');
+}
+
+function guardarPasoBitacora(){
+  limpiarError('errBitacora');
+  recolectarValores(document.getElementById('camposBitacoraCont'), VALORES_BITACORA);
+
+  if (ESCANEO_ACTUAL.requiereAdmin) {
+    // INSPECCION SUPERVISOR / INSPECCION CALIDAD: sin checklist ni huella — directo al formulario.
+    abrirPasoFormulario();
+  } else {
+    abrirPasoLiberacion();
+  }
+}
+
+/* =====================================================================================
+ * PASO 2 — CHECKLIST DEL LÍDER + HUELLA / PIN DE RESPALDO
+ * ===================================================================================== */
+function abrirPasoLiberacion(){
+  document.getElementById('resumenLiberacion').innerHTML = resumenPiezaHtml();
+  limpiarError('errLiberacion');
+  document.getElementById('bloqueHuella').className = 'oculto';
+  document.getElementById('bloqueFallbackPin').className = 'oculto';
+  document.getElementById('btnIrAHuella').hidden = false;
+  document.getElementById('huellaEstado').textContent = 'Toca el botón para autenticar con huella.';
+
+  var cont = document.getElementById('checklistCont');
+  cont.innerHTML = '';
+  var items = ESCANEO_ACTUAL.checklistLider || [];
+  document.getElementById('checklistVacioMsg').hidden = items.length > 0;
+  items.forEach(function(item){
+    var fila = document.createElement('label');
+    fila.className = 'campo-check';
+    fila.innerHTML = '<input type="checkbox" data-clave="' + item.clave + '"><span>' + item.etiqueta + '</span>';
+    cont.appendChild(fila);
+  });
+  mostrarPantalla('p-liberacion');
+}
+
+function continuarAHuella(){
+  limpiarError('errLiberacion');
+  var items = ESCANEO_ACTUAL.checklistLider || [];
+  var cont = document.getElementById('checklistCont');
+  var faltan = false;
+  items.forEach(function(item){
+    var chk = cont.querySelector('[data-clave="' + item.clave + '"]');
+    VALORES_CHECKLIST[item.clave] = chk.checked ? 'SI' : 'NO';
+    if (!chk.checked) faltan = true;
+  });
+  if (faltan) { ponerError('errLiberacion','Marca todos los puntos del checklist antes de continuar.'); return; }
+
+  document.getElementById('btnIrAHuella').hidden = true;
+  document.getElementById('bloqueHuella').className = '';
+}
+
+function intentarHuella(){
+  limpiarError('errLiberacion');
+  var btn = document.getElementById('btnHuella');
+  var estado = document.getElementById('huellaEstado');
+
+  if (!window.PublicKeyCredential) {
+    estado.textContent = 'Este navegador no soporta huella (WebAuthn). Usa el PIN de respaldo.';
+    mostrarFallbackPin();
+    return;
+  }
+
+  conBotonCargando(btn, 'Verificando...', function(){
+    return llamarServidor('iniciarLiberacionEtapa', ESCANEO_ACTUAL.folio, SESION.equipoId).then(function(resp){
+      if (!resp.tieneCredencial) {
+        estado.textContent = 'Este equipo no tiene huella de líder registrada todavía.';
+        mostrarFallbackPin();
+        return Promise.resolve();
+      }
+      var challengeBytes = new TextEncoder().encode(resp.challenge);
+      var opciones = {
+        publicKey: {
+          challenge: challengeBytes,
+          // sin "rpId": el navegador usa el origen real de la página, igual que al
+          // crear la credencial (ver Index_Huellas.html) — no lo adivinamos nosotros.
+          allowCredentials: [{ id: base64urlABuffer(resp.credentialId), type: 'public-key' }],
+          userVerification: 'required',
+          timeout: 45000
+        }
+      };
+      return navigator.credentials.get(opciones).then(function(credencial){
+        var asercion = { credentialId: credencial.id, challenge: resp.challenge };
+        return llamarServidor('verificarLiberacionEtapa', ESCANEO_ACTUAL.folio, SESION.equipoId, asercion);
+      }).then(function(resp2){
+        TICKET_LIBERACION = resp2.ticketLiberacion;
+        estado.textContent = 'Huella verificada (' + (resp2.nombreLider || 'líder') + ').';
+        setTimeout(abrirPasoFormulario, 400);
+      }).catch(function(errWebauthn){
+        estado.textContent = 'No se pudo leer la huella (' + (errWebauthn && errWebauthn.name ? errWebauthn.name : 'error') + '). Usa el PIN de respaldo.';
+        mostrarFallbackPin();
+      });
+    }).catch(function(err){ ponerError('errLiberacion', err); });
+  });
+}
+
+function mostrarFallbackPin(){
+  document.getElementById('bloqueHuella').className = '';
+  document.getElementById('bloqueFallbackPin').className = '';
+}
+
+function autenticarConPinRespaldo(){
+  limpiarError('errLiberacion');
+  var usuarioAdmin = document.getElementById('inFallbackUsuario').value.trim();
+  var pinAdmin = document.getElementById('inFallbackPin').value.trim();
+  if (!usuarioAdmin || !pinAdmin) { ponerError('errLiberacion','Escribe usuario y PIN del Supervisor/Calidad.'); return; }
+
+  llamarServidor('liberarEtapaConPIN', ESCANEO_ACTUAL.folio, usuarioAdmin, pinAdmin).then(function(resp){
+    TICKET_LIBERACION = resp.ticketLiberacion;
+    document.getElementById('inFallbackUsuario').value = '';
+    document.getElementById('inFallbackPin').value = '';
+    abrirPasoFormulario();
+  }).catch(function(err){ ponerError('errLiberacion', err); });
+}
+
+function base64urlABuffer(b64url){
+  var pad = b64url.length % 4 === 0 ? '' : '='.repeat(4 - (b64url.length % 4));
+  var b64 = (b64url + pad).replace(/-/g,'+').replace(/_/g,'/');
+  var raw = atob(b64);
+  var arr = new Uint8Array(raw.length);
+  for (var i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr.buffer;
+}
+
+/* =====================================================================================
+ * PASO 3 — FORMULARIO (-> BDD_EVENTOS)
+ * ===================================================================================== */
+function abrirPasoFormulario(){
+  document.getElementById('resumenFormulario').innerHTML = resumenPiezaHtml();
+  document.getElementById('etapaFormularioNombre').textContent = CONTEXTO.departamento;
+  limpiarError('errFormulario');
+
+  var esInspeccionSupervisor = CONTEXTO.departamento === 'INSPECCION SUPERVISOR';
+  document.getElementById('hallazgoToggleCont').className = esInspeccionSupervisor ? '' : 'oculto';
+  if (esInspeccionSupervisor) elegirHallazgo(false);
+
+  var cont = document.getElementById('camposFormularioCont');
+  cont.innerHTML = '';
+  var campos = (ESCANEO_ACTUAL.camposFormulario || []).filter(function(c){
+    return !(esInspeccionSupervisor && HALLAZGO_CLAVES.indexOf(c.clave) !== -1);
+  });
+  document.getElementById('notaFormularioVacia').hidden = (ESCANEO_ACTUAL.camposFormulario || []).length > 0;
+  campos.forEach(function(campo){ cont.appendChild(renderizarCampo(campo, VALORES_FORMULARIO)); });
+
+  if (esInspeccionSupervisor) {
+    var contHallazgo = document.createElement('div');
+    contHallazgo.id = 'camposHallazgoCont';
+    contHallazgo.hidden = true;
+    (ESCANEO_ACTUAL.camposFormulario || []).filter(function(c){
+      return HALLAZGO_CLAVES.indexOf(c.clave) !== -1;
+    }).forEach(function(campo){ contHallazgo.appendChild(renderizarCampo(campo, VALORES_FORMULARIO)); });
+    cont.appendChild(contHallazgo);
+  }
+
+  mostrarPantalla('p-formulario');
+}
+
+function elegirHallazgo(hayHallazgo){
+  document.getElementById('btnHallazgoSi').className = hayHallazgo ? 'sel-si' : '';
+  document.getElementById('btnHallazgoNo').className = !hayHallazgo ? 'sel-no' : '';
+  var contHallazgo = document.getElementById('camposHallazgoCont');
+  if (contHallazgo) contHallazgo.hidden = !hayHallazgo;
+  if (!hayHallazgo) {
+    HALLAZGO_CLAVES.forEach(function(clave){ delete VALORES_FORMULARIO[clave]; });
+  }
+}
+
+function guardarFormularioFinal(){
+  limpiarError('errFormulario');
+  var cont = document.getElementById('camposFormularioCont');
+  recolectarValores(cont, VALORES_FORMULARIO);
+
+  var payload = {
+    folio: ESCANEO_ACTUAL.folio,
+    departamento: CONTEXTO.departamento,
+    camposBitacora: VALORES_BITACORA,
+    camposFormulario: VALORES_FORMULARIO
+  };
+  if (ESCANEO_ACTUAL.requiereAdmin) {
+    payload.idUsuario = SESION.usuario;
+  } else {
+    payload.idUsuario = SESION.equipoId || SESION.usuario;
+    payload.nombreTecnico = ''; // el técnico puede ajustar esto si se agrega un campo de nombre a la bitácora
+    payload.ticketLiberacion = TICKET_LIBERACION;
+  }
+
+  var btn = document.getElementById('btnGuardarFormulario');
+  conBotonCargando(btn, 'Guardando...', function(){
+    return llamarServidor('finalizarActividad', payload).then(function(){
+      mostrarExito('Actividad registrada', 'Folio ' + ESCANEO_ACTUAL.folio + ' avanzó a ' + CONTEXTO.departamento + '.');
+    }).catch(function(err){ ponerError('errFormulario', err); });
+  });
+}
+
+/* =====================================================================================
+ * CAMPOS DINÁMICOS (renderizado genérico de CONFIG_CAMPOS_BITACORA / _FORMULARIO)
+ * ===================================================================================== */
+function renderizarCampo(campo, bolsaValores){
+  var wrap = document.createElement('div');
+  var idCampo = 'campo_' + campo.clave;
+  var valorActual = bolsaValores[campo.clave];
+
+  if (campo.tipo === 'checkbox') {
+    wrap.innerHTML = '<label class="campo-check"><input type="checkbox" id="' + idCampo + '"' +
+      (valorActual === 'SI' ? ' checked' : '') + '><span>' + campo.etiqueta + '</span></label>';
+    return wrap;
+  }
+
+  var etiqueta = document.createElement('label');
+  etiqueta.textContent = campo.etiqueta;
+  wrap.appendChild(etiqueta);
+
+  var input;
+  if (campo.tipo === 'select') {
+    input = document.createElement('select');
+    (campo.opciones || []).forEach(function(op){
+      var o = document.createElement('option');
+      o.value = op; o.textContent = op === '' ? 'Selecciona...' : op;
+      if (op === valorActual) o.selected = true;
+      input.appendChild(o);
+    });
+  } else if (campo.tipo === 'textarea') {
+    input = document.createElement('textarea');
+    input.value = valorActual || '';
+  } else {
+    input = document.createElement('input');
+    input.type = campo.tipo === 'number' ? 'number' : 'text';
+    input.value = valorActual || '';
+  }
+  input.id = idCampo;
+  wrap.appendChild(input);
+  return wrap;
+}
+
+function recolectarValores(contenedor, bolsaValores){
+  contenedor.querySelectorAll('[id^="campo_"]').forEach(function(el){
+    var clave = el.id.replace('campo_','');
+    if (el.type === 'checkbox') {
+      bolsaValores[clave] = el.checked ? 'SI' : 'NO';
+    } else {
+      bolsaValores[clave] = el.value;
+    }
+  });
+}
+
+/* =====================================================================================
+ * ÉXITO / NAVEGACIÓN DE CIERRE
+ * ===================================================================================== */
+function mostrarExito(titulo, texto){
+  document.getElementById('exitoTitulo').textContent = titulo;
+  document.getElementById('exitoTexto').textContent = texto;
+  mostrarPantalla('p-exito');
+}
+
+function volverAEscanearOtra(){
+  var titulo = document.getElementById('escaneoTitulo').textContent;
+  ESCANEO_ACTUAL = null; VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; TICKET_LIBERACION = null;
+  irAEscanear(titulo);
+}
+
+/* =====================================================================================
+ * MARCAR / LIBERAR HOLD (Supervisor / Calidad)
+ * ===================================================================================== */
+function confirmarMarcarHold(){
+  limpiarError('errHold');
+  var folio = document.getElementById('inFolioHold').value.trim();
+  var motivo = document.getElementById('inMotivoHold').value.trim();
+  if (!folio) { ponerError('errHold','Escribe o escanea un folio.'); return; }
+
+  llamarServidor('marcarHold', folio, SESION.usuario, motivo).then(function(){
+    mostrarExito('Pieza en HOLD', 'Folio ' + folio + ' quedó en HOLD.');
+  }).catch(function(err){ ponerError('errHold', err); });
+}
+
+function buscarPiezaHold(){
+  limpiarError('errResolverHold');
+  var folio = document.getElementById('inFolioResolverHold').value.trim();
+  if (!folio) { ponerError('errResolverHold','Escribe o escanea un folio.'); return; }
+
+  llamarServidor('obtenerPiezaParaHold', folio, SESION.usuario).then(function(resp){
+    PIEZA_HOLD_ACTUAL = { folio: folio };
+    document.getElementById('resumenResolverHold').innerHTML =
+      '<div class="folio-grande">' + folio + '</div>WOINT: <b>' + (resp.pieza.woint||'—') +
+      '</b> · JOB: <b>' + (resp.pieza.job||'—') + '</b><br>Etapa detenida: <b>' + (resp.pieza.etapaActual||'—') + '</b>';
+    document.getElementById('bloqueBuscarHold').className = 'oculto';
+    document.getElementById('bloqueResolverHold').className = '';
+  }).catch(function(err){ ponerError('errResolverHold', err); });
+}
+
+function confirmarResolverHold(){
+  limpiarError('errResolverHold');
+  var nuevaDisposicion = document.getElementById('inNuevaDisposicion').value;
+  var comentario = document.getElementById('inComentarioResolverHold').value.trim();
+  if (!nuevaDisposicion) { ponerError('errResolverHold','Selecciona la nueva disposición.'); return; }
+
+  llamarServidor('resolverHold', {
+    folio: PIEZA_HOLD_ACTUAL.folio,
+    idUsuario: SESION.usuario,
+    nuevaDisposicion: nuevaDisposicion,
+    comentario: comentario
+  }).then(function(){
+    mostrarExito('HOLD liberado', 'Folio ' + PIEZA_HOLD_ACTUAL.folio + ' quedó liberado.');
+  }).catch(function(err){ ponerError('errResolverHold', err); });
+}
+
+/* ---- Arranque ---- */
+mostrarPantalla('p-login');
+</script>
+</body>
+</html>
