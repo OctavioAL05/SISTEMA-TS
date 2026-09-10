@@ -125,6 +125,11 @@
       <label>Nombre de quien registra su rostro</label>
       <input type="text" id="inNombreLider" placeholder="Nombre completo">
 
+      <label>Departamento que puede liberar (solo para líderes con cuenta separada, ej. LIDER1)</label>
+      <input type="text" id="inDepartamentoResponsable" placeholder="Ej. LAMINADO, TRIMMING, BOND IN...">
+      <p class="campo-ayuda">Déjalo vacío si esta cuenta ES la del equipo (ej. laminadopyka@gmail.com) — en ese caso su propio departamento ya la autoriza. Solo llénalo para una cuenta de líder aparte (LIDER1, LIDER2, etc.) que deba limitarse a un departamento específico. Un Supervisor o el Administrador siempre pueden liberar cualquier departamento, sin necesidad de esto.</p>
+      <button class="btn-link" id="btnGuardarDepartamento" onclick="guardarDepartamentoResponsable()">Guardar solo el departamento (sin volver a capturar el rostro)</button>
+
       <video id="videoRegistro" autoplay playsinline muted></video>
       <p class="rostro-estado" id="registrarEstado">Escribe el nombre y toca el botón para capturar el rostro.</p>
       <button class="btn btn-primario" id="btnRegistrarRostro" onclick="capturarRostro()">Registrar rostro</button>
@@ -256,6 +261,7 @@ function pintarLista(){
     b.className = 'fila-cuenta';
     b.onclick = function(){ abrirRegistro(c); };
     var rol = c.esAdmin ? (c.rolDepartamento || 'Supervisor/Calidad') : (c.rolDepartamento || 'Equipo');
+    if (c.departamentoResponsable) { rol += ' · libera: ' + c.departamentoResponsable; }
     b.innerHTML =
       '<div class="info"><b>' + (c.nombreLider || c.usuario) + '</b>' +
       '<span>' + c.equipoId + ' · ' + rol + '</span></div>' +
@@ -273,6 +279,7 @@ function abrirRegistro(cuenta){
   document.getElementById('registrarTitulo').textContent = cuenta.tieneRostro ? 'Volver a registrar rostro' : 'Registrar rostro';
   document.getElementById('registrarSubt').textContent = cuenta.equipoId + ' · ' + (cuenta.rolDepartamento || '');
   document.getElementById('inNombreLider').value = cuenta.nombreLider || '';
+  document.getElementById('inDepartamentoResponsable').value = cuenta.departamentoResponsable || '';
   document.getElementById('registrarEstado').textContent = 'Cargando cámara...';
   mostrarPantalla('p-registrar');
 
@@ -331,9 +338,11 @@ function capturarRostro(){
         }
         var descriptor = Array.prototype.slice.call(deteccion.descriptor);
         estado.textContent = 'Rostro detectado. Guardando...';
+        var departamentoResponsable = document.getElementById('inDepartamentoResponsable').value.trim();
         return llamarServidor('registrarRostro', {
           equipoId: equipoId,
           nombreLider: nombreLider,
+          departamentoResponsable: departamentoResponsable,
           descriptor: descriptor,
           idUsuarioAdmin: ADMIN_USUARIO,
           pinAdmin: ADMIN_PIN
@@ -345,6 +354,31 @@ function capturarRostro(){
         });
       });
   }).catch(function(err){ ponerError('errRegistrar', err); });
+}
+
+/* ---- Guardar SOLO el departamento responsable, sin volver a capturar el rostro
+   (útil para configurarlo antes de que el líder esté presente, o corregirlo después) ---- */
+function guardarDepartamentoResponsable(){
+  limpiarError('errRegistrar');
+  document.getElementById('okRegistrar').hidden = true;
+  var equipoId = CUENTA_SELECCIONADA.equipoId;
+  var departamentoResponsable = document.getElementById('inDepartamentoResponsable').value.trim();
+  var btn = document.getElementById('btnGuardarDepartamento');
+
+  conBotonCargando(btn, 'Guardando...', function(){
+    return llamarServidor('asignarDepartamentoLider', {
+      equipoId: equipoId,
+      departamentoResponsable: departamentoResponsable,
+      idUsuarioAdmin: ADMIN_USUARIO,
+      pinAdmin: ADMIN_PIN
+    }).then(function(){
+      document.getElementById('okRegistrar').hidden = false;
+      document.getElementById('okRegistrar').textContent = departamentoResponsable
+        ? 'Departamento guardado: ' + departamentoResponsable + ' (' + equipoId + ').'
+        : 'Se quitó la asignación de departamento de ' + equipoId + '.';
+      cargarCuentas();
+    }).catch(function(err){ ponerError('errRegistrar', err); });
+  });
 }
 
 /* ---- Arranque ---- */
