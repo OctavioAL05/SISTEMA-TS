@@ -201,8 +201,17 @@
       <label>Folio</label>
       <input type="text" class="campo-folio" id="inFolio" placeholder="FOLIO" autofocus
         onkeydown="if(event.key==='Enter'){event.preventDefault();escanearFolio();}">
-      <p class="campo-ayuda">Si usas una pistola lectora, solo enfoca este campo y escanea — el Enter se envía solo.</p>
+      <p class="campo-ayuda">Si usas una pistola lectora, solo enfoca este campo y escanea — el Enter se envía solo. O usa la cámara del dispositivo con el botón de abajo.</p>
       <button class="btn btn-primario" id="btnEscanear" onclick="escanearFolio()">Continuar</button>
+
+      <button class="btn" id="btnUsarCamaraQR" style="background:#0f172a;color:#fff;" onclick="abrirCamaraQR()">Usar cámara para escanear QR</button>
+      <div id="bloqueCamaraQR" class="oculto" style="margin-top:14px;">
+        <video id="videoQR" autoplay playsinline muted style="width:100%;max-width:320px;border-radius:12px;background:#0f172a;display:block;margin:0 auto;"></video>
+        <canvas id="canvasQR" style="display:none;"></canvas>
+        <p class="huella-estado" id="estadoQR">Cargando cámara...</p>
+        <button class="btn-link" onclick="cerrarCamaraQR()">Cancelar cámara</button>
+      </div>
+
       <button class="btn-link" onclick="volverAlMenu()">Volver al menú</button>
     </div>
   </section>
@@ -359,6 +368,12 @@
      carpeta "models/" deben subirse al mismo repositorio que este HTML, junto a él
      (ver instrucciones de despliegue). -->
 <script src="face-api.min.js"></script>
+
+<!-- jsQR: lectura de códigos QR con la cámara del dispositivo, 100% en el navegador
+     (sin depender de que el navegador tenga soporte nativo de BarcodeDetector, que
+     no existe en todos, p.ej. Safari/iOS). Sube "jsQR.js" al mismo repositorio,
+     junto a este HTML. -->
+<script src="jsQR.js"></script>
 
 <script>
 /* =====================================================================================
@@ -613,6 +628,7 @@ function botonMenu(texto, onClick, clase){
 
 function volverAlMenu(){
   ESCANEO_ACTUAL = null; VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; LIDER_SESION = null;
+  cerrarCamaraQR();
   irAMenu();
 }
 
@@ -623,8 +639,75 @@ function irAEscanear(titulo){
   document.getElementById('escaneoTitulo').textContent = titulo;
   document.getElementById('inFolio').value = '';
   limpiarError('errEscaneo');
+  cerrarCamaraQR();
   mostrarPantalla('p-escaneo');
   setTimeout(function(){ document.getElementById('inFolio').focus(); }, 50);
+}
+
+/* =====================================================================================
+ * ESCANEO POR CÁMARA (QR) — alternativa a la pistola lectora. Usa jsQR (jsQR.js,
+ * 100% en el navegador) para leer el código directamente de la imagen de la cámara,
+ * cuadro por cuadro, y en cuanto detecta uno, llena el folio y continúa solo, igual
+ * que si lo hubiera tecleado una pistola lectora.
+ * ===================================================================================== */
+var QR_STREAM = null;
+var QR_ANIMFRAME = null;
+
+function abrirCamaraQR(){
+  limpiarError('errEscaneo');
+  if (!window.jsQR) {
+    ponerError('errEscaneo','La librería de lectura de QR no cargó. Revisa que "jsQR.js" esté subido junto a esta página.');
+    return;
+  }
+  document.getElementById('bloqueCamaraQR').className = '';
+  document.getElementById('btnUsarCamaraQR').hidden = true;
+  document.getElementById('estadoQR').textContent = 'Cargando cámara...';
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function(stream){
+    QR_STREAM = stream;
+    var video = document.getElementById('videoQR');
+    video.srcObject = stream;
+    document.getElementById('estadoQR').textContent = 'Apunta la cámara al código QR de la pieza...';
+    QR_ANIMFRAME = requestAnimationFrame(tickCamaraQR);
+  }).catch(function(err){
+    document.getElementById('estadoQR').textContent =
+      'No se pudo abrir la cámara (' + (err && err.message ? err.message : err) + ').';
+  });
+}
+
+function cerrarCamaraQR(){
+  if (QR_ANIMFRAME) { cancelAnimationFrame(QR_ANIMFRAME); QR_ANIMFRAME = null; }
+  if (QR_STREAM) { QR_STREAM.getTracks().forEach(function(t){ t.stop(); }); QR_STREAM = null; }
+  var video = document.getElementById('videoQR');
+  if (video) video.srcObject = null;
+  var bloque = document.getElementById('bloqueCamaraQR');
+  var btn = document.getElementById('btnUsarCamaraQR');
+  if (bloque) bloque.className = 'oculto';
+  if (btn) btn.hidden = false;
+}
+
+function tickCamaraQR(){
+  var video = document.getElementById('videoQR');
+  if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    QR_ANIMFRAME = requestAnimationFrame(tickCamaraQR);
+    return;
+  }
+  var canvas = document.getElementById('canvasQR');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  var ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  var imagen = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  var codigo = jsQR(imagen.data, imagen.width, imagen.height, { inversionAttempts: 'dontInvert' });
+
+  if (codigo && codigo.data && codigo.data.trim()) {
+    document.getElementById('estadoQR').textContent = 'Código detectado: ' + codigo.data;
+    document.getElementById('inFolio').value = codigo.data.trim();
+    cerrarCamaraQR();
+    escanearFolio();
+    return;
+  }
+  QR_ANIMFRAME = requestAnimationFrame(tickCamaraQR);
 }
 
 function escanearFolio(){
