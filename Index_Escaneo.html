@@ -141,16 +141,6 @@
         <button class="btn-link" onclick="cambiarUsuarioLogin()">Cambiar de usuario</button>
       </div>
 
-      <div id="bloqueLoginHuella" class="oculto">
-        <svg class="huella-icono" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5">
-          <path d="M12 11c0 3-1 5-1 7M8 12c0-3 1.6-5 4-5s4 2 4 5c0 1-.1 2-.3 3M16 15.5c.2-1 .3-2 .3-3.5 0-4-2-6.5-4.3-6.5S7.7 8 7.7 12c0 .7 0 1.3.1 1.9M5 10a7 7 0 0 1 14 0M12 20c-2.8 0-4-1.7-4.5-3"/>
-        </svg>
-        <p class="huella-estado" id="loginHuellaEstado">Toca el botón para autenticar con tu huella.</p>
-        <button class="btn btn-primario" id="btnLoginHuella" onclick="hacerLoginHuella()">Autenticar con huella</button>
-        <p class="campo-ayuda">¿Tu huella falla? Pide al Administrador que haga esta acción desde su propia cuenta.</p>
-        <button class="btn-link" onclick="cambiarUsuarioLogin()">Cambiar de usuario</button>
-      </div>
-
       <button class="btn-link" onclick="mostrarPantalla('p-reset-pin')">¿Necesitas dar de alta o resetear un PIN?</button>
     </div>
   </section>
@@ -168,8 +158,8 @@
       <label>Nuevo PIN (4 dígitos)</label>
       <input type="password" id="inResetNuevoPin" inputmode="numeric" maxlength="4" placeholder="••••">
 
-      <p class="campo-ayuda">Esto es solo para PIN de técnicos o del Administrador. Las huellas de líderes,
-        Supervisores y Calidad se registran aparte (pídelo al Administrador).</p>
+      <p class="campo-ayuda">Todos (técnico, líder, Supervisor, Calidad, Administrador) usan PIN para iniciar
+        sesión. El rostro de líderes/Supervisor/Calidad se registra aparte (pídelo al Administrador).</p>
 
       <div class="toggle-grupo" style="margin-top:16px;">
         <button type="button" id="btnModoAdmin" class="sel-si" onclick="elegirModoReset('admin')">Autorizar con el Administrador</button>
@@ -232,7 +222,7 @@
     </div>
   </section>
 
-  <!-- ============ PANTALLA: LIBERACIÓN — CHECKLIST + HUELLA/PIN (paso 2) ============ -->
+  <!-- ============ PANTALLA: LIBERACIÓN — LOGIN DEL LÍDER + CHECKLIST (paso 2) ============ -->
   <section id="p-liberacion" class="pantalla">
     <div class="tarjeta">
       <div class="stepper"><div class="paso hecho"></div><div class="paso activo"></div><div class="paso"></div></div>
@@ -240,32 +230,48 @@
       <div class="pieza-resumen" id="resumenLiberacion"></div>
       <div class="banner-error" id="errLiberacion" hidden></div>
 
-      <div id="bloqueChecklist">
+      <div id="bloqueLoginLider">
+        <h2>Inicio de sesión del líder</h2>
+        <p class="campo-ayuda">El líder de esta etapa debe iniciar sesión con su propio usuario y PIN antes de revisar y liberar.</p>
+        <label>Usuario del líder</label>
+        <input type="text" id="inLiderUsuario" autocomplete="off" placeholder="usuario del líder">
+        <label>PIN del líder</label>
+        <input type="password" id="inLiderPin" inputmode="numeric" maxlength="4" placeholder="••••"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();hacerLoginLider();}">
+        <button class="btn btn-primario" id="btnLoginLider" onclick="hacerLoginLider()">Continuar</button>
+      </div>
+
+      <div id="bloqueChecklist" class="oculto">
+        <p class="campo-ayuda" id="liderIdentificado"></p>
         <h2>Revisión del líder</h2>
         <div id="checklistCont"></div>
         <p class="checklist-vacio" id="checklistVacioMsg" hidden>Sin puntos de revisión configurados para esta etapa.</p>
+        <button class="btn btn-primario" onclick="validarChecklistYContinuar()">Siguiente</button>
       </div>
 
-      <div id="bloqueHuella" class="oculto" style="margin-top:8px;">
-        <h2>Autenticación del líder</h2>
-        <svg class="huella-icono" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5">
-          <path d="M12 11c0 3-1 5-1 7M8 12c0-3 1.6-5 4-5s4 2 4 5c0 1-.1 2-.3 3M16 15.5c.2-1 .3-2 .3-3.5 0-4-2-6.5-4.3-6.5S7.7 8 7.7 12c0 .7 0 1.3.1 1.9M5 10a7 7 0 0 1 14 0M12 20c-2.8 0-4-1.7-4.5-3"/>
-        </svg>
-        <p class="huella-estado" id="huellaEstado">Toca el botón para autenticar con huella.</p>
-        <button class="btn btn-primario" id="btnHuella" onclick="intentarHuella()">Autenticar con huella</button>
-        <button class="btn-link" onclick="mostrarFallbackPin()">La huella no funciona / respaldo del Administrador</button>
-
-        <div id="bloqueFallbackPin" class="oculto" style="margin-top:6px;">
-          <label>Usuario del Administrador</label>
-          <input type="text" id="inFallbackUsuario" placeholder="admin@dominio.com">
-          <label>PIN del Administrador</label>
-          <input type="password" id="inFallbackPin" inputmode="numeric" maxlength="4" placeholder="••••">
-          <button class="btn btn-ambar" onclick="autenticarConPinRespaldo()">Autenticar con PIN</button>
-        </div>
-      </div>
-
-      <button class="btn btn-secundario" id="btnIrAHuella" onclick="continuarAHuella()">Continuar a autenticación</button>
       <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ============ PANTALLA: VERIFICACIÓN DE ROSTRO (al presionar Enviar) ============ -->
+  <section id="p-rostro" class="pantalla">
+    <div class="tarjeta centrado">
+      <h1>Verificación de rostro</h1>
+      <p class="subt" id="rostroSubt">Mira a la cámara y toca "Capturar".</p>
+      <div class="banner-error" id="errRostro" hidden></div>
+      <video id="videoRostro" autoplay playsinline muted style="width:100%;max-width:320px;border-radius:12px;background:#0f172a;"></video>
+      <p class="huella-estado" id="rostroEstado">Cargando cámara...</p>
+      <button class="btn btn-primario" id="btnCapturarRostro" onclick="capturarYVerificarRostro()">Capturar</button>
+      <button class="btn-link" onclick="cancelarVerificacionRostro()">Cancelar</button>
+
+      <div id="bloqueOverrideAdmin" class="oculto" style="margin-top:14px;">
+        <p class="campo-ayuda">No coincidió 3 veces. Solo el Administrador puede autorizar este envío.</p>
+        <label>Usuario del Administrador</label>
+        <input type="text" id="inOverrideUsuario" placeholder="admin@dominio.com">
+        <label>PIN del Administrador</label>
+        <input type="password" id="inOverridePin" inputmode="numeric" maxlength="4" placeholder="••••">
+        <button class="btn btn-ambar" onclick="autorizarConAdminYFinalizar()">Autorizar y enviar</button>
+      </div>
     </div>
   </section>
 
@@ -348,6 +354,12 @@
 
 </main>
 
+<!-- face-api.js: reconocimiento facial 100% en el navegador (la foto nunca sale del
+     aparato — solo se manda un descriptor de 128 números al servidor). Archivo y
+     carpeta "models/" deben subirse al mismo repositorio que este HTML, junto a él
+     (ver instrucciones de despliegue). -->
+<script src="face-api.min.js"></script>
+
 <script>
 /* =====================================================================================
  * ESTADO GLOBAL EN MEMORIA (nunca localStorage/sessionStorage: PIN y sesión viven solo
@@ -355,15 +367,31 @@
  * lo cual es intencional para un equipo compartido en una tablet de piso).
  * ===================================================================================== */
 var SESION = null;            // { usuario, equipoId, esAdmin, esCoordinador, rolDepartamento, nombreLider }
-var USUARIO_LOGIN_EN_CURSO = null; // usuario ya escrito en el paso 1 del login, mientras se resuelve PIN o huella
+var USUARIO_LOGIN_EN_CURSO = null; // usuario ya escrito en el paso 1 del login, mientras se resuelve el PIN
+var LIDER_SESION = null;      // { usuario, equipoId, nombreLider } — login del líder dentro del paso 2 (etapas clásicas)
 var CONTEXTO = null;          // { modo: 'team'|'inspeccion'|'programada'|'hold'|'resolverHold', departamento }
 var ESCANEO_ACTUAL = null;    // respuesta de iniciarEscaneo (folio, pieza, requiereAdmin, camposBitacora, checklistLider, camposFormulario)
 var VALORES_BITACORA = {};
 var VALORES_CHECKLIST = {};
 var VALORES_FORMULARIO = {};
-var TICKET_LIBERACION = null;
 var HALLAZGO_CLAVES = ['HALLAZGO_UBICACION','INCIDENCIAS_DOCUMENTACION','INCIDENCIAS_PRODUCTO','UBICACION_PROBLEMA'];
 var PIEZA_HOLD_ACTUAL = null;
+
+/* Estado de la pantalla de verificación de rostro (p-rostro) */
+var ROSTRO_MODELOS_LISTOS = false;
+var ROSTRO_STREAM = null;
+var ROSTRO_CONTEXTO = null; // { idUsuarioObjetivo, payloadPendiente, departamento }
+
+/* Carga los modelos de face-api.js UNA vez, al abrir la página, desde la carpeta
+   models/ (debe estar subida junto a este HTML en el mismo hosting). */
+function cargarModelosRostro(){
+  if (ROSTRO_MODELOS_LISTOS || !window.faceapi) return Promise.resolve();
+  return Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri('models'),
+    faceapi.nets.faceLandmark68Net.loadFromUri('models'),
+    faceapi.nets.faceRecognitionNet.loadFromUri('models')
+  ]).then(function(){ ROSTRO_MODELOS_LISTOS = true; });
+}
 
 /* =====================================================================================
  * CONEXIÓN AL BACKEND — CORREGIDO 10 sep 2026: esta página YA NO se sirve desde
@@ -420,12 +448,12 @@ function conBotonCargando(btn, textoCargando, fn){
 }
 
 /* =====================================================================================
- * LOGIN — paso 1 decide el método (PIN o HUELLA) según la cuenta escrita; ver
- * iniciarSesion/metodoLoginParaFila_ en el backend. Técnicos y Administrador usan
- * PIN; Supervisores y Calidad usan su huella (no tienen PIN).
+ * LOGIN — CORREGIDO 10 sep 2026: todos (técnico, líder, Supervisor, Calidad,
+ * Administrador) usan usuario+PIN ahora (ver iniciarSesion/metodoLoginParaFila_ en
+ * el backend). La huella se abandonó — ver "VERIFICACIÓN DE ROSTRO" más abajo.
  * ===================================================================================== */
 function mostrarBloqueLogin(bloque){
-  ['bloqueLoginUsuario','bloqueLoginPin','bloqueLoginHuella'].forEach(function(id){
+  ['bloqueLoginUsuario','bloqueLoginPin'].forEach(function(id){
     document.getElementById(id).className = (id === bloque) ? '' : 'oculto';
   });
 }
@@ -448,20 +476,9 @@ function continuarLogin(){
   conBotonCargando(btn, 'Verificando...', function(){
     return llamarServidor('iniciarSesion', usuario).then(function(resp){
       USUARIO_LOGIN_EN_CURSO = usuario;
-      if (resp.metodo === 'PIN') {
-        document.getElementById('loginSubt').textContent = 'Escribe tu PIN.';
-        mostrarBloqueLogin('bloqueLoginPin');
-        setTimeout(function(){ document.getElementById('inLoginPin').focus(); }, 50);
-        return;
-      }
-      // HUELLA (Supervisor/Calidad)
-      document.getElementById('loginSubt').textContent = 'Autenticación por huella.';
-      document.getElementById('loginHuellaEstado').textContent = 'Toca el botón para autenticar con tu huella.';
-      mostrarBloqueLogin('bloqueLoginHuella');
-      if (!resp.tieneCredencial) {
-        document.getElementById('loginHuellaEstado').textContent =
-          'Esta cuenta todavía no tiene huella registrada. Pide al Administrador que la registre.';
-      }
+      document.getElementById('loginSubt').textContent = 'Escribe tu PIN.';
+      mostrarBloqueLogin('bloqueLoginPin');
+      setTimeout(function(){ document.getElementById('inLoginPin').focus(); }, 50);
     }).catch(function(err){ ponerError('errLogin', err); });
   });
 }
@@ -481,51 +498,6 @@ function hacerLoginPin(){
       USUARIO_LOGIN_EN_CURSO = null;
       actualizarHeaderSesion();
       irAMenu();
-    }).catch(function(err){ ponerError('errLogin', err); });
-  });
-}
-
-function hacerLoginHuella(){
-  limpiarError('errLogin');
-  var usuario = USUARIO_LOGIN_EN_CURSO;
-  var btn = document.getElementById('btnLoginHuella');
-  var estado = document.getElementById('loginHuellaEstado');
-
-  if (!window.PublicKeyCredential) {
-    estado.textContent = 'Este navegador no soporta huella (WebAuthn). Pide al Administrador que haga esta acción.';
-    return;
-  }
-
-  conBotonCargando(btn, 'Verificando...', function(){
-    return llamarServidor('iniciarSesion', usuario).then(function(resp){
-      if (!resp.tieneCredencial) {
-        estado.textContent = 'Esta cuenta todavía no tiene huella registrada. Pide al Administrador que la registre.';
-        return Promise.resolve();
-      }
-      var challengeBytes = new TextEncoder().encode(resp.challenge);
-      var opciones = {
-        publicKey: {
-          challenge: challengeBytes,
-          // sin "rpId": el navegador usa el origen real de la página, igual que al
-          // crear la credencial (ver Index_Huellas.html) — no lo adivinamos nosotros.
-          allowCredentials: [{ id: base64urlABuffer(resp.credentialId), type: 'public-key' }],
-          userVerification: 'required',
-          timeout: 45000
-        }
-      };
-      return navigator.credentials.get(opciones).then(function(credencial){
-        var asercion = { credentialId: credencial.id, challenge: resp.challenge };
-        return llamarServidor('verificarSesionHuella', usuario, asercion);
-      }).then(function(resp2){
-        SESION = resp2;
-        document.getElementById('inLoginUsuario').value = '';
-        USUARIO_LOGIN_EN_CURSO = null;
-        actualizarHeaderSesion();
-        irAMenu();
-      }).catch(function(errWebauthn){
-        estado.textContent = 'No se pudo leer la huella (' + (errWebauthn && errWebauthn.name ? errWebauthn.name : 'error') +
-          '). Pide al Administrador que haga esta acción desde su propia cuenta.';
-      });
     }).catch(function(err){ ponerError('errLogin', err); });
   });
 }
@@ -640,7 +612,7 @@ function botonMenu(texto, onClick, clase){
 }
 
 function volverAlMenu(){
-  ESCANEO_ACTUAL = null; VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; TICKET_LIBERACION = null;
+  ESCANEO_ACTUAL = null; VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; LIDER_SESION = null;
   irAMenu();
 }
 
@@ -676,7 +648,7 @@ function escanearFolio(){
   conBotonCargando(btn, 'Buscando...', function(){
     return llamarServidor('iniciarEscaneo', folio, CONTEXTO.departamento).then(function(resp){
       ESCANEO_ACTUAL = resp;
-      VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; TICKET_LIBERACION = null;
+      VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; LIDER_SESION = null;
       abrirPasoBitacora();
     }).catch(function(err){ ponerError('errEscaneo', err); });
   });
@@ -717,30 +689,49 @@ function guardarPasoBitacora(){
 }
 
 /* =====================================================================================
- * PASO 2 — CHECKLIST DEL LÍDER + HUELLA / PIN DE RESPALDO
+ * PASO 2 — LOGIN DEL LÍDER + CHECKLIST (el rostro se verifica al final, en el paso 3,
+ * al presionar "Enviar" — ver PASO 3 y "VERIFICACIÓN DE ROSTRO" más abajo)
  * ===================================================================================== */
 function abrirPasoLiberacion(){
   document.getElementById('resumenLiberacion').innerHTML = resumenPiezaHtml();
   limpiarError('errLiberacion');
-  document.getElementById('bloqueHuella').className = 'oculto';
-  document.getElementById('bloqueFallbackPin').className = 'oculto';
-  document.getElementById('btnIrAHuella').hidden = false;
-  document.getElementById('huellaEstado').textContent = 'Toca el botón para autenticar con huella.';
-
-  var cont = document.getElementById('checklistCont');
-  cont.innerHTML = '';
-  var items = ESCANEO_ACTUAL.checklistLider || [];
-  document.getElementById('checklistVacioMsg').hidden = items.length > 0;
-  items.forEach(function(item){
-    var fila = document.createElement('label');
-    fila.className = 'campo-check';
-    fila.innerHTML = '<input type="checkbox" data-clave="' + item.clave + '"><span>' + item.etiqueta + '</span>';
-    cont.appendChild(fila);
-  });
+  document.getElementById('inLiderUsuario').value = '';
+  document.getElementById('inLiderPin').value = '';
+  document.getElementById('bloqueLoginLider').className = '';
+  document.getElementById('bloqueChecklist').className = 'oculto';
   mostrarPantalla('p-liberacion');
 }
 
-function continuarAHuella(){
+function hacerLoginLider(){
+  limpiarError('errLiberacion');
+  var usuario = document.getElementById('inLiderUsuario').value.trim();
+  var pin = document.getElementById('inLiderPin').value.trim();
+  if (!usuario || !pin) { ponerError('errLiberacion','Escribe el usuario y el PIN del líder.'); return; }
+
+  var btn = document.getElementById('btnLoginLider');
+  conBotonCargando(btn, 'Entrando...', function(){
+    return llamarServidor('verificarPIN', usuario, pin).then(function(resp){
+      LIDER_SESION = resp;
+      document.getElementById('liderIdentificado').textContent =
+        'Líder identificado: ' + (resp.nombreLider || resp.usuario) + '.';
+      document.getElementById('bloqueLoginLider').className = 'oculto';
+      document.getElementById('bloqueChecklist').className = '';
+
+      var cont = document.getElementById('checklistCont');
+      cont.innerHTML = '';
+      var items = ESCANEO_ACTUAL.checklistLider || [];
+      document.getElementById('checklistVacioMsg').hidden = items.length > 0;
+      items.forEach(function(item){
+        var fila = document.createElement('label');
+        fila.className = 'campo-check';
+        fila.innerHTML = '<input type="checkbox" data-clave="' + item.clave + '"><span>' + item.etiqueta + '</span>';
+        cont.appendChild(fila);
+      });
+    }).catch(function(err){ ponerError('errLiberacion', err); });
+  });
+}
+
+function validarChecklistYContinuar(){
   limpiarError('errLiberacion');
   var items = ESCANEO_ACTUAL.checklistLider || [];
   var cont = document.getElementById('checklistCont');
@@ -751,81 +742,7 @@ function continuarAHuella(){
     if (!chk.checked) faltan = true;
   });
   if (faltan) { ponerError('errLiberacion','Marca todos los puntos del checklist antes de continuar.'); return; }
-
-  document.getElementById('btnIrAHuella').hidden = true;
-  document.getElementById('bloqueHuella').className = '';
-}
-
-function intentarHuella(){
-  limpiarError('errLiberacion');
-  var btn = document.getElementById('btnHuella');
-  var estado = document.getElementById('huellaEstado');
-
-  if (!window.PublicKeyCredential) {
-    estado.textContent = 'Este navegador no soporta huella (WebAuthn). Usa el PIN de respaldo.';
-    mostrarFallbackPin();
-    return;
-  }
-
-  conBotonCargando(btn, 'Verificando...', function(){
-    return llamarServidor('iniciarLiberacionEtapa', ESCANEO_ACTUAL.folio, SESION.equipoId).then(function(resp){
-      if (!resp.tieneCredencial) {
-        estado.textContent = 'Este equipo no tiene huella de líder registrada todavía.';
-        mostrarFallbackPin();
-        return Promise.resolve();
-      }
-      var challengeBytes = new TextEncoder().encode(resp.challenge);
-      var opciones = {
-        publicKey: {
-          challenge: challengeBytes,
-          // sin "rpId": el navegador usa el origen real de la página, igual que al
-          // crear la credencial (ver Index_Huellas.html) — no lo adivinamos nosotros.
-          allowCredentials: [{ id: base64urlABuffer(resp.credentialId), type: 'public-key' }],
-          userVerification: 'required',
-          timeout: 45000
-        }
-      };
-      return navigator.credentials.get(opciones).then(function(credencial){
-        var asercion = { credentialId: credencial.id, challenge: resp.challenge };
-        return llamarServidor('verificarLiberacionEtapa', ESCANEO_ACTUAL.folio, SESION.equipoId, asercion);
-      }).then(function(resp2){
-        TICKET_LIBERACION = resp2.ticketLiberacion;
-        estado.textContent = 'Huella verificada (' + (resp2.nombreLider || 'líder') + ').';
-        setTimeout(abrirPasoFormulario, 400);
-      }).catch(function(errWebauthn){
-        estado.textContent = 'No se pudo leer la huella (' + (errWebauthn && errWebauthn.name ? errWebauthn.name : 'error') + '). Usa el PIN de respaldo.';
-        mostrarFallbackPin();
-      });
-    }).catch(function(err){ ponerError('errLiberacion', err); });
-  });
-}
-
-function mostrarFallbackPin(){
-  document.getElementById('bloqueHuella').className = '';
-  document.getElementById('bloqueFallbackPin').className = '';
-}
-
-function autenticarConPinRespaldo(){
-  limpiarError('errLiberacion');
-  var usuarioAdmin = document.getElementById('inFallbackUsuario').value.trim();
-  var pinAdmin = document.getElementById('inFallbackPin').value.trim();
-  if (!usuarioAdmin || !pinAdmin) { ponerError('errLiberacion','Escribe usuario y PIN del Supervisor/Calidad.'); return; }
-
-  llamarServidor('liberarEtapaConPIN', ESCANEO_ACTUAL.folio, usuarioAdmin, pinAdmin).then(function(resp){
-    TICKET_LIBERACION = resp.ticketLiberacion;
-    document.getElementById('inFallbackUsuario').value = '';
-    document.getElementById('inFallbackPin').value = '';
-    abrirPasoFormulario();
-  }).catch(function(err){ ponerError('errLiberacion', err); });
-}
-
-function base64urlABuffer(b64url){
-  var pad = b64url.length % 4 === 0 ? '' : '='.repeat(4 - (b64url.length % 4));
-  var b64 = (b64url + pad).replace(/-/g,'+').replace(/_/g,'/');
-  var raw = atob(b64);
-  var arr = new Uint8Array(raw.length);
-  for (var i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
-  return arr.buffer;
+  abrirPasoFormulario();
 }
 
 /* =====================================================================================
@@ -882,20 +799,135 @@ function guardarFormularioFinal(){
     camposBitacora: VALORES_BITACORA,
     camposFormulario: VALORES_FORMULARIO
   };
+  var idUsuarioObjetivo; // cuenta contra la que se verifica el rostro (ver verificarRostro)
   if (ESCANEO_ACTUAL.requiereAdmin) {
+    // INSPECCION SUPERVISOR / INSPECCION CALIDAD: el propio Supervisor/Calidad ya
+    // logueado (SESION) es quien debe verificar su rostro.
     payload.idUsuario = SESION.usuario;
+    idUsuarioObjetivo = SESION.usuario;
   } else {
-    payload.idUsuario = SESION.equipoId || SESION.usuario;
-    payload.nombreTecnico = ''; // el técnico puede ajustar esto si se agrega un campo de nombre a la bitácora
-    payload.ticketLiberacion = TICKET_LIBERACION;
+    // Etapa clásica: el LÍDER que inició sesión en el paso 2 (LIDER_SESION) es quien
+    // debe verificar su rostro — no el usuario/equipo del técnico.
+    if (!LIDER_SESION) { ponerError('errFormulario','Falta el login del líder (paso anterior).'); return; }
+    payload.idUsuario = LIDER_SESION.usuario;
+    payload.nombreTecnico = LIDER_SESION.nombreLider || '';
+    idUsuarioObjetivo = LIDER_SESION.usuario;
   }
 
-  var btn = document.getElementById('btnGuardarFormulario');
-  conBotonCargando(btn, 'Guardando...', function(){
-    return llamarServidor('finalizarActividad', payload).then(function(){
-      mostrarExito('Actividad registrada', 'Folio ' + ESCANEO_ACTUAL.folio + ' avanzó a ' + CONTEXTO.departamento + '.');
-    }).catch(function(err){ ponerError('errFormulario', err); });
+  abrirPantallaRostro(idUsuarioObjetivo, payload);
+}
+
+/* =====================================================================================
+ * VERIFICACIÓN DE ROSTRO — CORREGIDO 10 sep 2026, reemplaza la huella. Se muestra al
+ * presionar "Enviar" en el formulario del líder (etapas clásicas) o de Supervisor/
+ * Calidad (INSPECCION SUPERVISOR/CALIDAD). Captura UNA foto con la cámara, calcula un
+ * descriptor de 128 números con face-api.js (100% en el navegador — la foto nunca
+ * sale del aparato) y lo manda a verificarRostro, que compara 1 contra 1 contra el
+ * rostro guardado de la cuenta que inició sesión (idUsuarioObjetivo). Si falla 3
+ * veces, se ofrece la anulación del Administrador (autorizarConAdmin).
+ * ===================================================================================== */
+function abrirPantallaRostro(idUsuarioObjetivo, payloadPendiente){
+  ROSTRO_CONTEXTO = { idUsuarioObjetivo: idUsuarioObjetivo, payloadPendiente: payloadPendiente, departamento: CONTEXTO.departamento };
+  limpiarError('errRostro');
+  document.getElementById('bloqueOverrideAdmin').className = 'oculto';
+  document.getElementById('inOverrideUsuario').value = '';
+  document.getElementById('inOverridePin').value = '';
+  document.getElementById('btnCapturarRostro').hidden = false;
+  document.getElementById('rostroSubt').textContent = 'Mira a la cámara y toca "Capturar".';
+  document.getElementById('rostroEstado').textContent = 'Cargando cámara...';
+  mostrarPantalla('p-rostro');
+
+  var video = document.getElementById('videoRostro');
+  Promise.all([
+    cargarModelosRostro(),
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+  ]).then(function(resultados){
+    ROSTRO_STREAM = resultados[1];
+    video.srcObject = ROSTRO_STREAM;
+    document.getElementById('rostroEstado').textContent = 'Listo. Mira a la cámara y toca "Capturar".';
+  }).catch(function(err){
+    document.getElementById('rostroEstado').textContent =
+      'No se pudo abrir la cámara (' + (err && err.message ? err.message : err) + ').';
   });
+}
+
+function detenerCamaraRostro(){
+  if (ROSTRO_STREAM) {
+    ROSTRO_STREAM.getTracks().forEach(function(t){ t.stop(); });
+    ROSTRO_STREAM = null;
+  }
+  document.getElementById('videoRostro').srcObject = null;
+}
+
+function cancelarVerificacionRostro(){
+  detenerCamaraRostro();
+  ROSTRO_CONTEXTO = null;
+  // Vuelve a la pantalla de donde vino (formulario), sin perder lo ya capturado.
+  mostrarPantalla('p-formulario');
+}
+
+function capturarYVerificarRostro(){
+  limpiarError('errRostro');
+  var video = document.getElementById('videoRostro');
+  var estado = document.getElementById('rostroEstado');
+  var btn = document.getElementById('btnCapturarRostro');
+
+  if (!window.faceapi || !ROSTRO_MODELOS_LISTOS) {
+    ponerError('errRostro','La librería de reconocimiento facial no cargó. Revisa que "face-api.min.js" y la carpeta "models/" estén subidos junto a esta página.');
+    return;
+  }
+
+  conBotonCargando(btn, 'Analizando...', function(){
+    return faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor()
+      .then(function(deteccion){
+        if (!deteccion) {
+          estado.textContent = 'No se detectó un rostro. Acércate y vuelve a intentar.';
+          return;
+        }
+        var descriptorVivo = Array.prototype.slice.call(deteccion.descriptor);
+        return llamarServidor('verificarRostro', ROSTRO_CONTEXTO.idUsuarioObjetivo, ROSTRO_CONTEXTO.payloadPendiente.folio, descriptorVivo)
+          .then(function(resp){
+            if (resp.coincide) {
+              estado.textContent = 'Rostro verificado. Enviando...';
+              detenerCamaraRostro();
+              ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = resp.ticketAutorizacion;
+              return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente).then(function(){
+                mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + '.');
+              });
+            }
+            if (resp.requiereAdmin) {
+              estado.textContent = 'El rostro no coincidió 3 veces.';
+              document.getElementById('btnCapturarRostro').hidden = true;
+              document.getElementById('bloqueOverrideAdmin').className = '';
+              return;
+            }
+            estado.textContent = 'El rostro no coincidió. Intentos restantes: ' + resp.intentosRestantes + '.';
+          });
+      });
+  }).catch(function(err){ ponerError('errRostro', err); });
+}
+
+function autorizarConAdminYFinalizar(){
+  limpiarError('errRostro');
+  var usuarioAdmin = document.getElementById('inOverrideUsuario').value.trim();
+  var pinAdmin = document.getElementById('inOverridePin').value.trim();
+  if (!usuarioAdmin || !pinAdmin) { ponerError('errRostro','Escribe usuario y PIN del Administrador.'); return; }
+
+  llamarServidor('autorizarConAdmin', {
+    idUsuarioAdmin: usuarioAdmin,
+    pinAdmin: pinAdmin,
+    idUsuarioObjetivo: ROSTRO_CONTEXTO.idUsuarioObjetivo,
+    folio: ROSTRO_CONTEXTO.payloadPendiente.folio,
+    departamento: ROSTRO_CONTEXTO.departamento
+  }).then(function(resp){
+    detenerCamaraRostro();
+    ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = resp.ticketAutorizacion;
+    return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente);
+  }).then(function(){
+    mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + ' (autorizado por el Administrador).');
+  }).catch(function(err){ ponerError('errRostro', err); });
 }
 
 /* =====================================================================================
