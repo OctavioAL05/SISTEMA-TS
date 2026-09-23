@@ -78,6 +78,9 @@
     .campo-check input[type=checkbox]{width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--azul);}
     .campo-check span{font-size:14.5px;line-height:1.35;padding-top:1px;}
     .checklist-vacio{color:var(--gris);font-size:13.5px;font-style:italic;padding:6px 0 2px;}
+    .campo-justificacion{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;
+      padding:8px 12px 12px;margin-top:4px;}
+    .campo-justificacion label{color:#92400e;margin:4px 0 6px;}
 
     .pieza-resumen{background:var(--fondo);border-radius:10px;padding:12px 14px;margin-bottom:16px;
       font-size:13.5px;color:#334155;}
@@ -224,6 +227,7 @@
       <div class="pieza-resumen" id="resumenBitacora"></div>
       <div class="banner-error" id="errBitacora" hidden></div>
       <h2>Bitácora — <span id="etapaBitacoraNombre"></span></h2>
+      <div class="banner-ok" id="notaMaterialPrecargado" hidden></div>
       <div id="camposBitacoraCont"></div>
       <p class="campo-ayuda" id="notaBitacoraVacia" hidden>Esta etapa todavía no tiene campos de bitácora configurados.</p>
       <button class="btn btn-primario" id="btnBitacoraSiguiente" onclick="guardarPasoBitacora()">Siguiente</button>
@@ -747,10 +751,41 @@ function resumenPiezaHtml(){
 /* =====================================================================================
  * PASO 1 — BITÁCORA
  * ===================================================================================== */
+// AGREGADO 22 sep 2026: mapa clave de campo de bitácora -> clave del catálogo de
+// materiales (ver iniciarEscaneo/materialPrecargado en el backend). El usuario
+// confirmó que la bitácora funciona como GUÍA de cuánto material usar por pieza y
+// pidió precargar esas cantidades en vez de que el técnico las escriba a ciegas.
+var MAPA_MATERIAL_PRECARGADO = {
+  S3_LAM125_GR: 'LAM125_GR', S3_LAM229_GR: 'LAM229_GR',
+  S3_SILICA_GR: 'SILICA_GR', S3_ALGODON_GR: 'ALGODON_GR'
+};
+
 function abrirPasoBitacora(){
   document.getElementById('resumenBitacora').innerHTML = resumenPiezaHtml();
   document.getElementById('etapaBitacoraNombre').textContent = CONTEXTO.departamento;
   limpiarError('errBitacora');
+
+  // Precarga la guía de materiales (Sección 3) si el backend mandó un catálogo para
+  // esta pieza (NO_PARTE) — el técnico puede ajustar la cantidad si realmente usó
+  // algo distinto, esto solo prellena el campo.
+  var notaMaterial = document.getElementById('notaMaterialPrecargado');
+  var material = ESCANEO_ACTUAL.materialPrecargado;
+  if (material) {
+    var partes = [];
+    Object.keys(MAPA_MATERIAL_PRECARGADO).forEach(function(claveCampo){
+      var claveCatalogo = MAPA_MATERIAL_PRECARGADO[claveCampo];
+      var valor = material[claveCatalogo];
+      if (valor !== undefined && valor !== '' && valor !== null) {
+        if (VALORES_BITACORA[claveCampo] === undefined) VALORES_BITACORA[claveCampo] = valor;
+        partes.push(claveCatalogo.replace('_GR','') + ': ' + valor + 'gr');
+      }
+    });
+    notaMaterial.hidden = partes.length === 0;
+    notaMaterial.textContent = partes.length ? ('Guía de materiales para esta pieza — ' + partes.join(' · ')) : '';
+  } else {
+    notaMaterial.hidden = true;
+  }
+
   var cont = document.getElementById('camposBitacoraCont');
   cont.innerHTML = '';
   var campos = ESCANEO_ACTUAL.camposBitacora || [];
@@ -762,6 +797,12 @@ function abrirPasoBitacora(){
 function guardarPasoBitacora(){
   limpiarError('errBitacora');
   recolectarValores(document.getElementById('camposBitacoraCont'), VALORES_BITACORA);
+
+  // AGREGADO 22 sep 2026: valida los campos tipo 'disposicion' (A/AD/RW/RJ, ej.
+  // Sección 8 de la bitácora de Wet Lay-Up) — exige seleccionar una opción y, si no
+  // es "A", exige justificación.
+  var errDisp = validarCamposObligatorios_(ESCANEO_ACTUAL.camposBitacora || [], VALORES_BITACORA);
+  if (errDisp) { ponerError('errBitacora', errDisp); return; }
 
   if (ESCANEO_ACTUAL.requiereAdmin) {
     // INSPECCION SUPERVISOR / INSPECCION CALIDAD: sin checklist ni huella — directo al formulario.
@@ -808,12 +849,11 @@ function hacerLoginLider(){
       cont.innerHTML = '';
       var items = ESCANEO_ACTUAL.checklistLider || [];
       document.getElementById('checklistVacioMsg').hidden = items.length > 0;
-      items.forEach(function(item){
-        var fila = document.createElement('label');
-        fila.className = 'campo-check';
-        fila.innerHTML = '<input type="checkbox" data-clave="' + item.clave + '"><span>' + item.etiqueta + '</span>';
-        cont.appendChild(fila);
-      });
+      // CORREGIDO 22 sep 2026: antes solo renderizaba checkboxes a mano (data-clave);
+      // ahora usa renderizarCampo genérico para soportar también 'text'/'textarea'/
+      // 'select'/'disposicion' (ej. Supervisa, Comentarios y los A/AD/RW/RJ de
+      // Desmolde en la bitácora de Wet Lay-Up).
+      items.forEach(function(item){ cont.appendChild(renderizarCampo(item, VALORES_CHECKLIST)); });
     }).catch(function(err){ ponerError('errLiberacion', err); });
   });
 }
@@ -822,13 +862,17 @@ function validarChecklistYContinuar(){
   limpiarError('errLiberacion');
   var items = ESCANEO_ACTUAL.checklistLider || [];
   var cont = document.getElementById('checklistCont');
+  recolectarValores(cont, VALORES_CHECKLIST);
+
   var faltan = false;
   items.forEach(function(item){
-    var chk = cont.querySelector('[data-clave="' + item.clave + '"]');
-    VALORES_CHECKLIST[item.clave] = chk.checked ? 'SI' : 'NO';
-    if (!chk.checked) faltan = true;
+    if (item.tipo === 'checkbox' && VALORES_CHECKLIST[item.clave] !== 'SI') faltan = true;
   });
   if (faltan) { ponerError('errLiberacion','Marca todos los puntos del checklist antes de continuar.'); return; }
+
+  var errDisp = validarCamposObligatorios_(items, VALORES_CHECKLIST);
+  if (errDisp) { ponerError('errLiberacion', errDisp); return; }
+
   abrirPasoFormulario();
 }
 
@@ -884,6 +928,11 @@ function guardarFormularioFinal(){
     folio: ESCANEO_ACTUAL.folio,
     departamento: CONTEXTO.departamento,
     camposBitacora: VALORES_BITACORA,
+    // CORREGIDO 22 sep 2026: faltaba mandar el checklist del líder al backend —
+    // VALORES_CHECKLIST se llenaba en validarChecklistYContinuar pero nunca se
+    // adjuntaba aquí, así que finalizarActividad nunca lo recibía (crítico ahora:
+    // el HOLD automático de Desmolde depende de estos valores, ver finalizarActividad).
+    checklistLider: VALORES_CHECKLIST,
     camposFormulario: VALORES_FORMULARIO
   };
   var idUsuarioObjetivo; // cuenta contra la que se verifica el rostro (ver verificarRostro)
@@ -1031,6 +1080,49 @@ function renderizarCampo(campo, bolsaValores){
     return wrap;
   }
 
+  // AGREGADO 22 sep 2026: tipo 'disposicion' — A=Aprobado / AD=Aprobado con
+  // Desviación / RW=Retrabajo / RJ=Rechazo (bitácora de Wet Lay-Up, Secciones 6 y 8).
+  // Cualquier valor != 'A' muestra (y exige, ver validarCamposObligatorios_) una
+  // justificación en un campo hermano "<clave>_JUSTIFICACION".
+  if (campo.tipo === 'disposicion') {
+    var etiquetaDisp = document.createElement('label');
+    etiquetaDisp.textContent = campo.etiqueta;
+    wrap.appendChild(etiquetaDisp);
+
+    var etiquetasOpciones = { A: 'A - Aprobado', AD: 'AD - Aprobado con desviación', RW: 'RW - Retrabajo', RJ: 'RJ - Rechazo' };
+    var selectDisp = document.createElement('select');
+    selectDisp.id = idCampo;
+    var opVacia = document.createElement('option');
+    opVacia.value = ''; opVacia.textContent = 'Selecciona...';
+    selectDisp.appendChild(opVacia);
+    (campo.opciones || ['A', 'AD', 'RW', 'RJ']).forEach(function(op){
+      var o = document.createElement('option');
+      o.value = op; o.textContent = etiquetasOpciones[op] || op;
+      if (op === valorActual) o.selected = true;
+      selectDisp.appendChild(o);
+    });
+    wrap.appendChild(selectDisp);
+
+    var idJust = idCampo + '_JUSTIFICACION';
+    var contJust = document.createElement('div');
+    contJust.className = 'campo-justificacion';
+    contJust.hidden = !valorActual || valorActual === 'A';
+    var etiquetaJust = document.createElement('label');
+    etiquetaJust.textContent = 'Justificación (obligatoria si no es "A")';
+    contJust.appendChild(etiquetaJust);
+    var txtJust = document.createElement('textarea');
+    txtJust.id = idJust;
+    txtJust.value = bolsaValores[campo.clave + '_JUSTIFICACION'] || '';
+    contJust.appendChild(txtJust);
+    wrap.appendChild(contJust);
+
+    selectDisp.addEventListener('change', function(){
+      contJust.hidden = !selectDisp.value || selectDisp.value === 'A';
+    });
+
+    return wrap;
+  }
+
   var etiqueta = document.createElement('label');
   etiqueta.textContent = campo.etiqueta;
   wrap.appendChild(etiqueta);
@@ -1066,6 +1158,26 @@ function recolectarValores(contenedor, bolsaValores){
       bolsaValores[clave] = el.value;
     }
   });
+}
+
+// AGREGADO 22 sep 2026: valida los campos tipo 'disposicion' de un arreglo de config
+// (CONFIG_CAMPOS_BITACORA o CONFIG_CHECKLIST_LIDER) contra los valores ya
+// recolectados — exige seleccionar una opción y, si no es "A", exige justificación.
+// Devuelve el primer mensaje de error, o null si todo está bien.
+function validarCamposObligatorios_(campos, bolsaValores){
+  for (var i = 0; i < campos.length; i++) {
+    var campo = campos[i];
+    if (campo.tipo !== 'disposicion') continue;
+    var valor = bolsaValores[campo.clave];
+    if (!valor) return 'Selecciona una opción para "' + campo.etiqueta + '".';
+    if (valor !== 'A') {
+      var justificacion = bolsaValores[campo.clave + '_JUSTIFICACION'];
+      if (!justificacion || !justificacion.trim()) {
+        return 'Falta justificación para "' + campo.etiqueta + '" (seleccionaste "' + valor + '").';
+      }
+    }
+  }
+  return null;
 }
 
 /* =====================================================================================
