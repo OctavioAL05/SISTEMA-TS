@@ -108,6 +108,14 @@
       display:flex;align-items:center;justify-content:center;margin:8px auto 16px;font-size:34px;color:var(--verde);}
     .centrado{text-align:center;}
     .campo-ayuda{font-size:11.5px;color:var(--gris-claro);margin-top:4px;}
+
+    /* AGREGADO 23 sep 2026: separador visual entre sub-etapas de una misma bitácora
+       (ej. Limpieza y Tratamiento de Molde / Preparación de Resina / Laminado dentro
+       de "Bitácora - LAMINADO") — pedido del usuario: "necesito que se diferencie
+       dentro de LAMINADO las sub etapas". Ver renderizarCampo, tipo 'seccion'. */
+    .campo-seccion{margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--azul);
+      font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.03em;}
+    .campo-seccion:first-child{margin-top:0;}
   </style>
 </head>
 <body>
@@ -395,6 +403,10 @@ var VALORES_CHECKLIST = {};
 var VALORES_FORMULARIO = {};
 var HALLAZGO_CLAVES = ['HALLAZGO_UBICACION','INCIDENCIAS_DOCUMENTACION','INCIDENCIAS_PRODUCTO','UBICACION_PROBLEMA'];
 var PIEZA_HOLD_ACTUAL = null;
+// AGREGADO 23 sep 2026: qué columna de "Supervisa" (si aplica) se autocompleta sola
+// con la identidad del líder en cuanto inicia sesión (hacerLoginLider) — ver la nota
+// junto a S4_REALIZADO_POR/S7_REALIZADO_POR en CONFIG_CAMPOS_BITACORA (Escaneo.gs).
+var CLAVE_SUPERVISA_POR_DEPTO = { 'LAMINADO': 'S4_SUPERVISA', 'TRIMMING': 'S7_SUPERVISA' };
 
 /* Estado de la pantalla de verificación de rostro (p-rostro) */
 var ROSTRO_MODELOS_LISTOS = false;
@@ -845,6 +857,16 @@ function hacerLoginLider(){
       document.getElementById('bloqueLoginLider').className = 'oculto';
       document.getElementById('bloqueChecklist').className = '';
 
+      // AGREGADO 23 sep 2026: el campo "Supervisa" (S4_SUPERVISA en Laminado,
+      // S7_SUPERVISA en Trimming) ya no se le pregunta al técnico (él todavía no sabe
+      // quién va a supervisar) — el usuario pidió que "se debe de llenar solo al
+      // saber quien es el lider de ese departamento", así que se llena solo, aquí
+      // mismo, en cuanto el líder de verdad inicia sesión — sin mostrar ninguna
+      // pregunta nueva. Mismas columnas de siempre, ver CONFIG_CAMPOS_BITACORA en
+      // Escaneo.gs (comentario junto a S4_REALIZADO_POR/S7_REALIZADO_POR).
+      var claveSupervisa = CLAVE_SUPERVISA_POR_DEPTO[CONTEXTO.departamento];
+      if (claveSupervisa) { VALORES_BITACORA[claveSupervisa] = resp.nombreLider || resp.usuario; }
+
       var cont = document.getElementById('checklistCont');
       cont.innerHTML = '';
       var items = ESCANEO_ACTUAL.checklistLider || [];
@@ -1034,7 +1056,14 @@ function capturarYVerificarRostro(){
               });
             }
             if (resp.requiereAdmin) {
-              estado.textContent = 'El rostro no coincidió 3 veces.';
+              // CORREGIDO 23 sep 2026: antes "sin rostro registrado" (ej. la propia
+              // cuenta del Administrador, que nunca tiene FACE_DESCRIPTOR) llegaba
+              // como error duro y nunca entraba aquí — ver verificarRostro en
+              // Escaneo.gs. Ahora sí llega con requiereAdmin:true, distinguido con
+              // sinRostroRegistrado para mostrar un mensaje más claro que "no coincidió".
+              estado.textContent = resp.sinRostroRegistrado
+                ? 'Esta cuenta no tiene rostro registrado. Pide al Administrador que autorice el envío.'
+                : 'El rostro no coincidió 3 veces.';
               document.getElementById('btnCapturarRostro').hidden = true;
               document.getElementById('bloqueOverrideAdmin').className = '';
               return;
@@ -1071,6 +1100,18 @@ function autorizarConAdminYFinalizar(){
  * ===================================================================================== */
 function renderizarCampo(campo, bolsaValores){
   var wrap = document.createElement('div');
+
+  // AGREGADO 23 sep 2026: tipo 'seccion' — solo un separador visual (título de
+  // sub-etapa, ej. "Limpieza y Tratamiento de Molde"/"Preparación de Resina"/
+  // "Laminado"), no es una pregunta: no lleva id="campo_..." a propósito, así que
+  // recolectarValores() y validarCamposObligatorios_() lo ignoran solos (no buscan
+  // nada con ese id / no es tipo 'disposicion').
+  if (campo.tipo === 'seccion') {
+    wrap.className = 'campo-seccion';
+    wrap.textContent = campo.etiqueta;
+    return wrap;
+  }
+
   var idCampo = 'campo_' + campo.clave;
   var valorActual = bolsaValores[campo.clave];
 
