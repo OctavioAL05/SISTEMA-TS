@@ -116,6 +116,19 @@
     .campo-seccion{margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--azul);
       font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.03em;}
     .campo-seccion:first-child{margin-top:0;}
+
+    /* AGREGADO 25 sep 2026: tipos nuevos del flujo por secciones de Infusión — ver
+       renderizarCampo, tipos 'nota' (instructivo de solo lectura, AUTOMATICO en el
+       CSV), 'recap' (muestra datos que YA cargó el técnico, para que el líder los
+       confirme) y 'lista_check' (checkboxes múltiples que arman un solo valor con
+       comas, ej. "DEFECTOS ENCONTRADOS"). */
+    .campo-nota{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;
+      padding:11px 13px;margin:14px 0;font-size:13px;color:#1e3a5f;line-height:1.42;}
+    .campo-recap{background:#f8fafc;border:1px dashed var(--borde);border-radius:10px;
+      padding:11px 13px;margin:14px 0;font-size:13.5px;}
+    .campo-recap b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.03em;
+      color:var(--gris);margin-bottom:6px;}
+    .campo-recap div{padding:2px 0;color:#334155;}
   </style>
 </head>
 <body>
@@ -357,17 +370,32 @@
       </div>
       <div id="bloqueResolverHold" class="oculto">
         <div class="pieza-resumen" id="resumenResolverHold"></div>
-        <label>Nueva disposición</label>
-        <select id="inNuevaDisposicion">
-          <option value="">Selecciona...</option>
-          <option>APROBADA</option>
-          <option>APROBADA CON DESVIACION</option>
-          <option>RETRABAJO</option>
-          <option>SCRAP</option>
-        </select>
-        <label>Comentario</label>
-        <textarea id="inComentarioResolverHold" placeholder="Comentario de la resolución"></textarea>
-        <button class="btn btn-primario" onclick="confirmarResolverHold()">Liberar HOLD</button>
+
+        <!-- AGREGADO 25 sep 2026: caso especial de Infusión — la pieza quedó en HOLD
+             porque el líder rechazó (RJ) el 2do intento de tratamiento de
+             desmoldante (Sección 3). Aquí el Supervisor NO elige una disposición
+             genérica — autoriza (o no) un 3er y último intento. Ver
+             resolverEscaladoDesmoldante en Escaneo.gs. -->
+        <div id="bloqueEscaladoDesmoldante" class="oculto">
+          <p class="campo-ayuda">Esta pieza quedó en HOLD porque el líder rechazó el 2do intento de tratamiento de
+            desmoldante (Limpieza y Tratamiento de Molde). Autoriza un 3er y último intento — tú mismo revisarás
+            ese 3er intento cuando el técnico lo repita (inicia sesión como "líder" con tu propio usuario).</p>
+          <button class="btn btn-ambar" onclick="confirmarAutorizarTercerIntento()">Autorizar 3er intento</button>
+        </div>
+
+        <div id="bloqueResolverHoldGenerico">
+          <label>Nueva disposición</label>
+          <select id="inNuevaDisposicion">
+            <option value="">Selecciona...</option>
+            <option>APROBADA</option>
+            <option>APROBADA CON DESVIACION</option>
+            <option>RETRABAJO</option>
+            <option>SCRAP</option>
+          </select>
+          <label>Comentario</label>
+          <textarea id="inComentarioResolverHold" placeholder="Comentario de la resolución"></textarea>
+          <button class="btn btn-primario" onclick="confirmarResolverHold()">Liberar HOLD</button>
+        </div>
       </div>
       <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
     </div>
@@ -748,7 +776,11 @@ function escanearFolio(){
     return llamarServidor('iniciarEscaneo', folio, CONTEXTO.departamento).then(function(resp){
       ESCANEO_ACTUAL = resp;
       VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; LIDER_SESION = null;
-      abrirPasoBitacora();
+      // AGREGADO 25 sep 2026: Infusión (LAMINADO/CURADO/DESMOLDE/TRIMMING) usa el
+      // flujo por secciones (ver módulo "Infusión — flujo por secciones" más abajo)
+      // en vez de las 3 pantallas clásicas — el backend lo marca con
+      // resp.flujoSecciones. Wet Lay-Up y Ensamble no cambian.
+      if (resp.flujoSecciones) { abrirPasoSeccionInfusion(); } else { abrirPasoBitacora(); }
     }).catch(function(err){ ponerError('errEscaneo', err); });
   });
 }
@@ -798,6 +830,17 @@ function abrirPasoBitacora(){
     notaMaterial.hidden = true;
   }
 
+  // AGREGADO 23 sep 2026: "quita las preguntas hora de inicio y hora de fin, lo
+  // debemos de obtener del escaneo" — ya no se le pregunta al técnico. La hora de
+  // inicio de Laminado (S4_HORA_INICIO) llega calculada en el propio servidor, en el
+  // momento exacto en que se escaneó el código para abrir esta etapa (ver
+  // horaInicioEtapa en iniciarEscaneo, Escaneo.gs); se guarda aquí sin mostrar nada.
+  // La hora de fin (S4_HORA_FIN) se calcula sola en el servidor al momento de
+  // guardar (ver finalizarActividad), no hace falta mandarla desde aquí.
+  if (ESCANEO_ACTUAL.horaInicioEtapa && VALORES_BITACORA.S4_HORA_INICIO === undefined) {
+    VALORES_BITACORA.S4_HORA_INICIO = ESCANEO_ACTUAL.horaInicioEtapa;
+  }
+
   var cont = document.getElementById('camposBitacoraCont');
   cont.innerHTML = '';
   var campos = ESCANEO_ACTUAL.camposBitacora || [];
@@ -807,13 +850,31 @@ function abrirPasoBitacora(){
 }
 
 function guardarPasoBitacora(){
+  // AGREGADO 25 sep 2026: en el flujo por secciones de Infusión, este mismo botón
+  // ("Siguiente" en la pantalla de bitácora) guarda la sección del técnico y pide la
+  // SIGUIENTE pantalla al servidor, en vez de pasar a la liberación clásica — ver
+  // guardarSeccionTecnicoUI.
+  if (ESCANEO_ACTUAL && ESCANEO_ACTUAL.flujoSecciones) { guardarSeccionTecnicoUI(); return; }
+
   limpiarError('errBitacora');
   recolectarValores(document.getElementById('camposBitacoraCont'), VALORES_BITACORA);
+
+  var camposEtapaBitacora = ESCANEO_ACTUAL.camposBitacora || [];
+
+  // AGREGADO 23 sep 2026: "en los check box, si no estan todos con check no puede
+  // avanzar" — antes solo se exigía esto en el checklist del LÍDER
+  // (validarChecklistYContinuar); el checklist que llena el TÉCNICO aquí mismo (ej.
+  // los 9 puntos de Wet Lay-Up en Laminado) no tenía ninguna validación y se podía
+  // avanzar con renglones sin marcar. Mismo criterio, ahora también aquí.
+  var faltanChecksTecnico = camposEtapaBitacora.some(function(campo){
+    return campo.tipo === 'checkbox' && VALORES_BITACORA[campo.clave] !== 'SI';
+  });
+  if (faltanChecksTecnico) { ponerError('errBitacora','Marca todos los puntos de la lista antes de continuar.'); return; }
 
   // AGREGADO 22 sep 2026: valida los campos tipo 'disposicion' (A/AD/RW/RJ, ej.
   // Sección 8 de la bitácora de Wet Lay-Up) — exige seleccionar una opción y, si no
   // es "A", exige justificación.
-  var errDisp = validarCamposObligatorios_(ESCANEO_ACTUAL.camposBitacora || [], VALORES_BITACORA);
+  var errDisp = validarCamposObligatorios_(camposEtapaBitacora, VALORES_BITACORA);
   if (errDisp) { ponerError('errBitacora', errDisp); return; }
 
   if (ESCANEO_ACTUAL.requiereAdmin) {
@@ -864,12 +925,19 @@ function hacerLoginLider(){
       // mismo, en cuanto el líder de verdad inicia sesión — sin mostrar ninguna
       // pregunta nueva. Mismas columnas de siempre, ver CONFIG_CAMPOS_BITACORA en
       // Escaneo.gs (comentario junto a S4_REALIZADO_POR/S7_REALIZADO_POR).
-      var claveSupervisa = CLAVE_SUPERVISA_POR_DEPTO[CONTEXTO.departamento];
-      if (claveSupervisa) { VALORES_BITACORA[claveSupervisa] = resp.nombreLider || resp.usuario; }
+      // AGREGADO 25 sep 2026: el auto-llenado de "Supervisa" solo aplica al flujo
+      // clásico (Wet Lay-Up) — Infusión no tiene ese campo en su config nueva.
+      if (!ESCANEO_ACTUAL.flujoSecciones) {
+        var claveSupervisa = CLAVE_SUPERVISA_POR_DEPTO[CONTEXTO.departamento];
+        if (claveSupervisa) { VALORES_BITACORA[claveSupervisa] = String(resp.nombreLider || resp.usuario).toUpperCase(); }
+      }
 
       var cont = document.getElementById('checklistCont');
       cont.innerHTML = '';
-      var items = ESCANEO_ACTUAL.checklistLider || [];
+      // AGREGADO 25 sep 2026: en el flujo por secciones, los campos del líder vienen
+      // en ESCANEO_ACTUAL.camposSeccion (con los 'recap' ya resueltos por el
+      // servidor), no en checklistLider.
+      var items = ESCANEO_ACTUAL.flujoSecciones ? (ESCANEO_ACTUAL.camposSeccion || []) : (ESCANEO_ACTUAL.checklistLider || []);
       document.getElementById('checklistVacioMsg').hidden = items.length > 0;
       // CORREGIDO 22 sep 2026: antes solo renderizaba checkboxes a mano (data-clave);
       // ahora usa renderizarCampo genérico para soportar también 'text'/'textarea'/
@@ -882,7 +950,7 @@ function hacerLoginLider(){
 
 function validarChecklistYContinuar(){
   limpiarError('errLiberacion');
-  var items = ESCANEO_ACTUAL.checklistLider || [];
+  var items = ESCANEO_ACTUAL.flujoSecciones ? (ESCANEO_ACTUAL.camposSeccion || []) : (ESCANEO_ACTUAL.checklistLider || []);
   var cont = document.getElementById('checklistCont');
   recolectarValores(cont, VALORES_CHECKLIST);
 
@@ -895,7 +963,121 @@ function validarChecklistYContinuar(){
   var errDisp = validarCamposObligatorios_(items, VALORES_CHECKLIST);
   if (errDisp) { ponerError('errLiberacion', errDisp); return; }
 
+  // AGREGADO 25 sep 2026: el flujo por secciones de Infusión no tiene pantalla de
+  // "formulario" aparte — va directo a verificación de rostro y de ahí a
+  // guardarSeccionLiderInfusion (ver abrirPantallaRostroInfusion).
+  if (ESCANEO_ACTUAL.flujoSecciones) { abrirPantallaRostroInfusion(); return; }
+
   abrirPasoFormulario();
+}
+
+/* =====================================================================================
+ * INFUSIÓN — FLUJO POR SECCIONES (AGREGADO 25 sep 2026) — reemplaza las 3 pantallas
+ * clásicas (bitácora/liberación/formulario) por: técnico llena UNA sección
+ * (p-bitacora, reutilizada) -> líder la revisa y decide (p-liberacion, reutilizada,
+ * con rostro igual que siempre) -> según el resultado, se repite la sección, se pasa
+ * a la siguiente, o la etapa queda completa/HOLD. Ver CONFIG_SECCIONES_INFUSION y
+ * las funciones guardarSeccionTecnicoInfusion/guardarSeccionLiderInfusion en
+ * Escaneo.gs.
+ * ===================================================================================== */
+function abrirPasoSeccionInfusion(){
+  if (ESCANEO_ACTUAL.fase === 'TECNICO') {
+    VALORES_BITACORA = {};
+    abrirTecnicoInfusion();
+  } else {
+    VALORES_CHECKLIST = {};
+    abrirPasoLiberacion();
+  }
+}
+
+function abrirTecnicoInfusion(){
+  document.getElementById('resumenBitacora').innerHTML = resumenPiezaHtml();
+  document.getElementById('etapaBitacoraNombre').textContent = CONTEXTO.departamento + ' — ' + (ESCANEO_ACTUAL.tituloSeccion || '');
+  limpiarError('errBitacora');
+  document.getElementById('notaMaterialPrecargado').hidden = true;
+
+  var campos = ESCANEO_ACTUAL.camposSeccion || [];
+  // Prellena ID. TOOLING / REVISION (vienen de CATALOGO_TIEMPOS_STD, ver
+  // resolverCamposEspecialesInfusion_ en Escaneo.gs) — el técnico puede corregirlos
+  // si el catálogo no trae el dato correcto.
+  campos.forEach(function(campo){
+    if (campo.valorPrellenado !== undefined && campo.valorPrellenado !== '' && VALORES_BITACORA[campo.clave] === undefined) {
+      VALORES_BITACORA[campo.clave] = campo.valorPrellenado;
+    }
+  });
+
+  var cont = document.getElementById('camposBitacoraCont');
+  cont.innerHTML = '';
+  document.getElementById('notaBitacoraVacia').hidden = campos.length > 0;
+  campos.forEach(function(campo){ cont.appendChild(renderizarCampo(campo, VALORES_BITACORA)); });
+  mostrarPantalla('p-bitacora');
+}
+
+function guardarSeccionTecnicoUI(){
+  limpiarError('errBitacora');
+  recolectarValores(document.getElementById('camposBitacoraCont'), VALORES_BITACORA);
+
+  var campos = ESCANEO_ACTUAL.camposSeccion || [];
+  var faltanChecks = campos.some(function(c){ return c.tipo === 'checkbox' && VALORES_BITACORA[c.clave] !== 'SI'; });
+  if (faltanChecks) { ponerError('errBitacora','Marca todos los puntos de la lista antes de continuar.'); return; }
+  var errDisp = validarCamposObligatorios_(campos, VALORES_BITACORA);
+  if (errDisp) { ponerError('errBitacora', errDisp); return; }
+
+  var payload = {
+    folio: ESCANEO_ACTUAL.folio, departamento: CONTEXTO.departamento,
+    seccionClave: ESCANEO_ACTUAL.seccionClave, intento: ESCANEO_ACTUAL.intento,
+    camposTecnico: VALORES_BITACORA
+  };
+  var btn = document.getElementById('btnBitacoraSiguiente');
+  conBotonCargando(btn, 'Guardando...', function(){
+    return llamarServidor('guardarSeccionTecnicoInfusion', payload)
+      .then(function(){ return llamarServidor('iniciarEscaneo', ESCANEO_ACTUAL.folio, CONTEXTO.departamento); })
+      .then(function(resp){ ESCANEO_ACTUAL = resp; abrirPasoSeccionInfusion(); })
+      .catch(function(err){ ponerError('errBitacora', err); });
+  });
+}
+
+function abrirPantallaRostroInfusion(){
+  if (!LIDER_SESION) { ponerError('errLiberacion','Falta el login del líder (paso anterior).'); return; }
+  var payload = {
+    folio: ESCANEO_ACTUAL.folio, departamento: CONTEXTO.departamento,
+    seccionClave: ESCANEO_ACTUAL.seccionClave, intento: ESCANEO_ACTUAL.intento,
+    idUsuario: LIDER_SESION.usuario, camposLider: VALORES_CHECKLIST
+  };
+  abrirPantallaRostro(LIDER_SESION.usuario, payload, 'INFUSION_LIDER');
+}
+
+/** Qué hacer con la respuesta de guardarSeccionLiderInfusion (ver `resultado` que
+ *  arma el backend: REINTENTO, SIGUIENTE_SECCION, ETAPA_COMPLETA, HOLD,
+ *  HOLD_ESCALADO_SUPERVISOR, HOLD_DEFINITIVO). */
+function manejarResultadoSeccionLiderInfusion(resp){
+  var folio = ROSTRO_CONTEXTO.payloadPendiente.folio;
+  var depto = CONTEXTO.departamento;
+
+  if (resp.resultado === 'REINTENTO' || resp.resultado === 'SIGUIENTE_SECCION') {
+    llamarServidor('iniciarEscaneo', folio, depto).then(function(resp2){
+      ESCANEO_ACTUAL = resp2;
+      abrirPasoSeccionInfusion();
+    }).catch(function(err){ ponerError('errRostro', err); });
+    return;
+  }
+  if (resp.resultado === 'ETAPA_COMPLETA') {
+    mostrarExito('Sección liberada', 'Folio ' + folio + ' completó ' + depto + '.');
+    return;
+  }
+  if (resp.resultado === 'HOLD') {
+    mostrarExito('Pieza enviada a HOLD', 'Folio ' + folio + ' quedó en HOLD durante ' + depto + '. El Supervisor debe resolverlo desde "Liberar HOLD".');
+    return;
+  }
+  if (resp.resultado === 'HOLD_ESCALADO_SUPERVISOR') {
+    mostrarExito('Pieza en HOLD — requiere al Supervisor', resp.mensaje || ('Folio ' + folio + ' quedó en HOLD, esperando que el Supervisor autorice un 3er intento.'));
+    return;
+  }
+  if (resp.resultado === 'HOLD_DEFINITIVO') {
+    mostrarExito('Pieza en HOLD', resp.mensaje || ('Folio ' + folio + ' quedó en HOLD y requiere decisión manual del Supervisor/Administrador.'));
+    return;
+  }
+  mostrarExito('Listo', 'Folio ' + folio + ' se guardó.');
 }
 
 /* =====================================================================================
@@ -984,8 +1166,13 @@ function guardarFormularioFinal(){
  * rostro guardado de la cuenta que inició sesión (idUsuarioObjetivo). Si falla 3
  * veces, se ofrece la anulación del Administrador (autorizarConAdmin).
  * ===================================================================================== */
-function abrirPantallaRostro(idUsuarioObjetivo, payloadPendiente){
-  ROSTRO_CONTEXTO = { idUsuarioObjetivo: idUsuarioObjetivo, payloadPendiente: payloadPendiente, departamento: CONTEXTO.departamento };
+function abrirPantallaRostro(idUsuarioObjetivo, payloadPendiente, modo){
+  // AGREGADO 25 sep 2026: `modo` distingue el envío final clásico ('CLASICO', el
+  // default de siempre -> finalizarActividad) del cierre de una sección de Infusión
+  // ('INFUSION_LIDER' -> guardarSeccionLiderInfusion, ver
+  // abrirPantallaRostroInfusion/manejarResultadoSeccionLiderInfusion) — la
+  // verificación de rostro en sí es EXACTAMENTE la misma en ambos casos.
+  ROSTRO_CONTEXTO = { idUsuarioObjetivo: idUsuarioObjetivo, payloadPendiente: payloadPendiente, departamento: CONTEXTO.departamento, modo: modo || 'CLASICO' };
   limpiarError('errRostro');
   document.getElementById('bloqueOverrideAdmin').className = 'oculto';
   document.getElementById('inOverrideUsuario').value = '';
@@ -1051,6 +1238,9 @@ function capturarYVerificarRostro(){
               estado.textContent = 'Rostro verificado. Enviando...';
               detenerCamaraRostro();
               ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = resp.ticketAutorizacion;
+              if (ROSTRO_CONTEXTO.modo === 'INFUSION_LIDER') {
+                return llamarServidor('guardarSeccionLiderInfusion', ROSTRO_CONTEXTO.payloadPendiente).then(manejarResultadoSeccionLiderInfusion);
+              }
               return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente).then(function(){
                 mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + '.');
               });
@@ -1089,9 +1279,17 @@ function autorizarConAdminYFinalizar(){
   }).then(function(resp){
     detenerCamaraRostro();
     ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = resp.ticketAutorizacion;
-    return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente);
-  }).then(function(){
-    mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + ' (autorizado por el Administrador).');
+    if (ROSTRO_CONTEXTO.modo === 'INFUSION_LIDER') {
+      return llamarServidor('guardarSeccionLiderInfusion', ROSTRO_CONTEXTO.payloadPendiente).then(function(resp2){
+        manejarResultadoSeccionLiderInfusion(resp2);
+        return null; // evita que el .then de abajo también muestre el mensaje clásico
+      });
+    }
+    return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente).then(function(){ return 'CLASICO'; });
+  }).then(function(marca){
+    if (marca === 'CLASICO') {
+      mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + ' (autorizado por el Administrador).');
+    }
   }).catch(function(err){ ponerError('errRostro', err); });
 }
 
@@ -1109,6 +1307,45 @@ function renderizarCampo(campo, bolsaValores){
   if (campo.tipo === 'seccion') {
     wrap.className = 'campo-seccion';
     wrap.textContent = campo.etiqueta;
+    return wrap;
+  }
+
+  // AGREGADO 25 sep 2026 — módulo Infusión (flujo por secciones): tipo 'nota' — puro
+  // texto instructivo de solo lectura (AUTOMATICO / SOLO MUESTRA LA NOTA en el CSV
+  // real), sin id ni clave: igual que 'seccion', recolectarValores() y
+  // validarCamposObligatorios_() lo ignoran solos.
+  if (campo.tipo === 'nota') {
+    wrap.className = 'campo-nota';
+    wrap.textContent = campo.etiqueta;
+    return wrap;
+  }
+
+  // AGREGADO 25 sep 2026 — tipo 'recap': muestra (solo lectura) datos que YA cargó
+  // el técnico en una sección anterior, para que el líder los confirme antes de
+  // decidir su disposición (ej. vigencia del desmoldante, PSI de la prueba de
+  // vacío, lote de resina/endurecedor) — el backend resuelve `campo.valores` justo
+  // antes de mandar la sección (ver resolverRecapInfusion_ en Escaneo.gs).
+  if (campo.tipo === 'recap') {
+    wrap.className = 'campo-recap';
+    var tituloRecap = document.createElement('b');
+    tituloRecap.textContent = campo.etiqueta;
+    wrap.appendChild(tituloRecap);
+    var valoresRecap = campo.valores || {};
+    var huboDatosRecap = false;
+    Object.keys(valoresRecap).forEach(function(k){
+      if (valoresRecap[k] === undefined || valoresRecap[k] === '' || valoresRecap[k] === null) return;
+      huboDatosRecap = true;
+      var linea = document.createElement('div');
+      linea.textContent = k + ': ' + valoresRecap[k];
+      wrap.appendChild(linea);
+    });
+    if (!huboDatosRecap) {
+      var vacioRecap = document.createElement('div');
+      vacioRecap.style.fontStyle = 'italic';
+      vacioRecap.style.color = 'var(--gris)';
+      vacioRecap.textContent = 'Sin datos registrados todavía.';
+      wrap.appendChild(vacioRecap);
+    }
     return wrap;
   }
 
@@ -1164,6 +1401,44 @@ function renderizarCampo(campo, bolsaValores){
     return wrap;
   }
 
+  // AGREGADO 25 sep 2026 — tipo 'lista_check': varios checkboxes que arman UN solo
+  // valor separado por comas (ej. "DEFECTOS ENCONTRADOS": FIBRA DEFORMADA/PINHOLES/
+  // PUENTE/FRACTURA) — Trimming de Infusión los usa para que el técnico marque
+  // varios defectos/FODs a la vez. Se guarda en un <input type="hidden"> con el
+  // mismo id="campo_<clave>" de siempre, así que recolectarValores() lo lee sin
+  // cambios (no es checkbox, cae en la rama "el.value").
+  if (campo.tipo === 'lista_check') {
+    var etiquetaLC = document.createElement('label');
+    etiquetaLC.textContent = campo.etiqueta;
+    wrap.appendChild(etiquetaLC);
+    var valorActualLC = String(valorActual || '');
+    var seleccionadosLC = valorActualLC ? valorActualLC.split(',').map(function(s){ return s.trim(); }) : [];
+    var inputOculto = document.createElement('input');
+    inputOculto.type = 'hidden';
+    inputOculto.id = idCampo;
+    inputOculto.value = valorActualLC;
+    wrap.appendChild(inputOculto);
+    (campo.opciones || []).forEach(function(op){
+      var filaLC = document.createElement('label');
+      filaLC.className = 'campo-check';
+      var check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = seleccionadosLC.indexOf(op) !== -1;
+      check.addEventListener('change', function(){
+        var actuales = inputOculto.value ? inputOculto.value.split(',').map(function(s){ return s.trim(); }).filter(function(s){ return s; }) : [];
+        var pos = actuales.indexOf(op);
+        if (check.checked && pos === -1) actuales.push(op);
+        if (!check.checked && pos !== -1) actuales.splice(pos, 1);
+        inputOculto.value = actuales.join(', ');
+      });
+      var spanLC = document.createElement('span');
+      spanLC.textContent = op;
+      filaLC.appendChild(check); filaLC.appendChild(spanLC);
+      wrap.appendChild(filaLC);
+    });
+    return wrap;
+  }
+
   var etiqueta = document.createElement('label');
   etiqueta.textContent = campo.etiqueta;
   wrap.appendChild(etiqueta);
@@ -1171,9 +1446,19 @@ function renderizarCampo(campo, bolsaValores){
   var input;
   if (campo.tipo === 'select') {
     input = document.createElement('select');
+    // CORREGIDO 23 sep 2026 (bug reportado: "Limpieza y prueba de adherencia" salía
+    // con "OK" marcado por default sin que nadie lo eligiera) — antes esta lista
+    // arrancaba directo en la primera opción del arreglo (ej. ['OK','NA'] -> el
+    // navegador preselecciona "OK" solo), así que un técnico podía dejarlo pasar sin
+    // tocarlo y quedaba "OK" aunque nunca lo revisó. Ahora, igual que el tipo
+    // 'disposicion', se antepone una opción en blanco para obligar a elegir.
+    var opVaciaSel = document.createElement('option');
+    opVaciaSel.value = ''; opVaciaSel.textContent = 'Selecciona...';
+    input.appendChild(opVaciaSel);
     (campo.opciones || []).forEach(function(op){
+      if (op === '') return; // ya se agregó la opción en blanco arriba, no duplicar
       var o = document.createElement('option');
-      o.value = op; o.textContent = op === '' ? 'Selecciona...' : op;
+      o.value = op; o.textContent = op;
       if (op === valorActual) o.selected = true;
       input.appendChild(o);
     });
@@ -1186,6 +1471,17 @@ function renderizarCampo(campo, bolsaValores){
     input.value = valorActual || '';
   }
   input.id = idCampo;
+  // AGREGADO 23 sep 2026: "haz que toda la información que metan en automático salga
+  // en mayúsculas" — se aplica a texto libre (text/textarea); números, selects y
+  // checkboxes no tienen mayúsculas/minúsculas que normalizar. Convierte en vivo
+  // mientras se escribe, conservando la posición del cursor.
+  if (campo.tipo === 'text' || campo.tipo === 'textarea') {
+    input.addEventListener('input', function(){
+      var inicio = input.selectionStart, fin = input.selectionEnd;
+      input.value = input.value.toUpperCase();
+      try { input.setSelectionRange(inicio, fin); } catch (e) { /* no-op en inputs que no soportan selección */ }
+    });
+  }
   wrap.appendChild(input);
   return wrap;
 }
@@ -1262,6 +1558,18 @@ function buscarPiezaHold(){
       '</b> · JOB: <b>' + (resp.pieza.job||'—') + '</b><br>Etapa detenida: <b>' + (resp.pieza.etapaActual||'—') + '</b>';
     document.getElementById('bloqueBuscarHold').className = 'oculto';
     document.getElementById('bloqueResolverHold').className = '';
+    // AGREGADO 25 sep 2026: ver bloqueEscaladoDesmoldante — el backend marca este
+    // caso especial en obtenerPiezaParaHold (ver escaladoDesmoldante en Escaneo.gs).
+    var esEscalado = !!resp.escaladoDesmoldante;
+    document.getElementById('bloqueEscaladoDesmoldante').className = esEscalado ? '' : 'oculto';
+    document.getElementById('bloqueResolverHoldGenerico').className = esEscalado ? 'oculto' : '';
+  }).catch(function(err){ ponerError('errResolverHold', err); });
+}
+
+function confirmarAutorizarTercerIntento(){
+  limpiarError('errResolverHold');
+  llamarServidor('resolverEscaladoDesmoldante', PIEZA_HOLD_ACTUAL.folio, SESION.usuario).then(function(){
+    mostrarExito('3er intento autorizado', 'Folio ' + PIEZA_HOLD_ACTUAL.folio + ' quedó liberado del HOLD. El técnico ya puede repetir el tratamiento de desmoldante.');
   }).catch(function(err){ ponerError('errResolverHold', err); });
 }
 
