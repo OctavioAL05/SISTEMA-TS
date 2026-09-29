@@ -1052,11 +1052,24 @@ function guardarSeccionTecnicoUI(){
     seccionClave: ESCANEO_ACTUAL.seccionClave, intento: ESCANEO_ACTUAL.intento,
     camposTecnico: VALORES_BITACORA
   };
+  var folioGuardado = ESCANEO_ACTUAL.folio;
+  var deptoGuardado = CONTEXTO.departamento;
   var btn = document.getElementById('btnBitacoraSiguiente');
   conBotonCargando(btn, 'Guardando...', function(){
     return llamarServidor('guardarSeccionTecnicoInfusion', payload)
-      .then(function(){ return llamarServidor('iniciarEscaneo', ESCANEO_ACTUAL.folio, CONTEXTO.departamento); })
-      .then(function(resp){ ESCANEO_ACTUAL = resp; abrirPasoSeccionInfusion(); })
+      .then(function(respGuardado){
+        // AGREGADO 29 sep 2026 (petición del usuario: Postcurado son 2 visitas
+        // separadas — técnico un día, líder hasta el día siguiente) — si el backend
+        // marca liderDiferido (ver ETAPAS_LIDER_DIFERIDO_INFUSION en Escaneo.gs), NO
+        // se encadena a la pantalla de líder: se cierra con éxito aquí mismo, y el
+        // líder la libera después en un escaneo aparte de esa misma pieza.
+        if (respGuardado && respGuardado.liderDiferido) {
+          mostrarExito('Registrado', 'Folio ' + folioGuardado + ' quedó registrado en ' + deptoGuardado + '. La liberación del líder se hace después, en un escaneo aparte.');
+          return;
+        }
+        return llamarServidor('iniciarEscaneo', folioGuardado, deptoGuardado)
+          .then(function(resp){ ESCANEO_ACTUAL = resp; abrirPasoSeccionInfusion(); });
+      })
       .catch(function(err){ ponerError('errBitacora', err); });
   });
 }
