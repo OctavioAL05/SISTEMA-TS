@@ -486,10 +486,17 @@ function mostrarPantalla(id){
   window.scrollTo(0,0);
 }
 
+// AGREGADO 29 sep 2026 (petición del usuario: si faltaba llenar un recuadro no había
+// ninguna alerta visible de por qué no avanzaba) — además de mostrar el banner de
+// siempre, ahora hace scroll hasta él (por si el botón que se presionó queda lejos
+// del banner en pantallas largas) y dispara un alert() nativo como aviso adicional,
+// imposible de pasar por alto en un celular de piso.
 function ponerError(idBanner, mensaje){
   var el = document.getElementById(idBanner);
   el.textContent = mensaje;
   el.hidden = false;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  try { window.alert(mensaje); } catch (e) { /* algunos navegadores en iframe bloquean alert(); el banner ya se mostró */ }
 }
 function limpiarError(idBanner){
   var el = document.getElementById(idBanner);
@@ -960,7 +967,7 @@ function validarChecklistYContinuar(){
   });
   if (faltan) { ponerError('errLiberacion','Marca todos los puntos del checklist antes de continuar.'); return; }
 
-  var errDisp = validarCamposObligatorios_(items, VALORES_CHECKLIST);
+  var errDisp = validarCamposObligatorios_(items, VALORES_CHECKLIST, ESCANEO_ACTUAL.flujoSecciones);
   if (errDisp) { ponerError('errLiberacion', errDisp); return; }
 
   // AGREGADO 25 sep 2026: el flujo por secciones de Infusión no tiene pantalla de
@@ -1020,7 +1027,7 @@ function guardarSeccionTecnicoUI(){
   var campos = ESCANEO_ACTUAL.camposSeccion || [];
   var faltanChecks = campos.some(function(c){ return c.tipo === 'checkbox' && VALORES_BITACORA[c.clave] !== 'SI'; });
   if (faltanChecks) { ponerError('errBitacora','Marca todos los puntos de la lista antes de continuar.'); return; }
-  var errDisp = validarCamposObligatorios_(campos, VALORES_BITACORA);
+  var errDisp = validarCamposObligatorios_(campos, VALORES_BITACORA, true);
   if (errDisp) { ponerError('errBitacora', errDisp); return; }
 
   var payload = {
@@ -1501,16 +1508,32 @@ function recolectarValores(contenedor, bolsaValores){
 // (CONFIG_CAMPOS_BITACORA o CONFIG_CHECKLIST_LIDER) contra los valores ya
 // recolectados — exige seleccionar una opción y, si no es "A", exige justificación.
 // Devuelve el primer mensaje de error, o null si todo está bien.
-function validarCamposObligatorios_(campos, bolsaValores){
+// AGREGADO 29 sep 2026 (bug reportado en el flujo por secciones de Infusión: un
+// recuadro de texto/número/selección se podía dejar vacío y el botón "Siguiente"
+// simplemente no avanzaba, sin avisar por qué) — 3er parámetro opcional
+// `exigirTextoNoVacio`: cuando es true, ADEMÁS exige que cualquier campo con CLAVE de
+// tipo texto/número/selección no quede vacío (se deja fuera 'textarea' a propósito —
+// los comentarios siguen siendo opcionales). Solo se activa en las 2 pantallas del
+// flujo por secciones de Infusión (ver guardarSeccionTecnicoUI y
+// validarChecklistYContinuar) — el flujo clásico de Wet Lay-Up no cambia.
+function validarCamposObligatorios_(campos, bolsaValores, exigirTextoNoVacio){
   for (var i = 0; i < campos.length; i++) {
     var campo = campos[i];
-    if (campo.tipo !== 'disposicion') continue;
-    var valor = bolsaValores[campo.clave];
-    if (!valor) return 'Selecciona una opción para "' + campo.etiqueta + '".';
-    if (valor !== 'A') {
-      var justificacion = bolsaValores[campo.clave + '_JUSTIFICACION'];
-      if (!justificacion || !justificacion.trim()) {
-        return 'Falta justificación para "' + campo.etiqueta + '" (seleccionaste "' + valor + '").';
+    if (campo.tipo === 'disposicion') {
+      var valor = bolsaValores[campo.clave];
+      if (!valor) return 'Selecciona una opción para "' + campo.etiqueta + '".';
+      if (valor !== 'A') {
+        var justificacion = bolsaValores[campo.clave + '_JUSTIFICACION'];
+        if (!justificacion || !justificacion.trim()) {
+          return 'Falta justificación para "' + campo.etiqueta + '" (seleccionaste "' + valor + '").';
+        }
+      }
+      continue;
+    }
+    if (exigirTextoNoVacio && campo.clave && (campo.tipo === 'text' || campo.tipo === 'number' || campo.tipo === 'select')) {
+      var valorTexto = bolsaValores[campo.clave];
+      if (valorTexto === undefined || valorTexto === null || String(valorTexto).trim() === '') {
+        return 'Falta llenar "' + campo.etiqueta + '".';
       }
     }
   }
