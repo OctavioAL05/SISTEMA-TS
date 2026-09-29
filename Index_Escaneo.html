@@ -631,12 +631,29 @@ function irAMenu(){
   lista.innerHTML = '';
 
   if (!SESION.esAdmin){
-    titulo.textContent = SESION.rolDepartamento || 'Tu equipo';
-    subt.textContent = 'Escanea la siguiente pieza para continuar.';
-    lista.appendChild(botonMenu('Escanear pieza', function(){
-      CONTEXTO = { modo:'team', departamento: SESION.rolDepartamento };
-      irAEscanear('Escanear pieza — ' + SESION.rolDepartamento);
-    }));
+    // AGREGADO 29 sep 2026 (petición del usuario: personal de TRIMMING y DETALLADO
+    // también hace CURADO) — si la cuenta tiene más de un departamento asignado
+    // (SESION.departamentos, ver departamentosDeUsuario_ en el backend), se muestra
+    // un botón por cada uno; si solo tiene uno, se ve exactamente igual que antes
+    // (un solo botón "Escanear pieza").
+    var deptos = (SESION.departamentos && SESION.departamentos.length) ? SESION.departamentos : [SESION.rolDepartamento];
+    if (deptos.length > 1) {
+      titulo.textContent = 'Tu equipo';
+      subt.textContent = 'Elige el departamento y escanea la siguiente pieza.';
+      deptos.forEach(function(depto){
+        lista.appendChild(botonMenu(depto, function(){
+          CONTEXTO = { modo:'team', departamento: depto };
+          irAEscanear('Escanear pieza — ' + depto);
+        }));
+      });
+    } else {
+      titulo.textContent = SESION.rolDepartamento || 'Tu equipo';
+      subt.textContent = 'Escanea la siguiente pieza para continuar.';
+      lista.appendChild(botonMenu('Escanear pieza', function(){
+        CONTEXTO = { modo:'team', departamento: SESION.rolDepartamento };
+        irAEscanear('Escanear pieza — ' + SESION.rolDepartamento);
+      }));
+    }
   } else {
     titulo.textContent = 'Supervisor / Calidad';
     subt.textContent = SESION.usuario;
