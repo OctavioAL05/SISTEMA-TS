@@ -273,6 +273,13 @@
         <input type="password" id="inLiderPin" inputmode="numeric" maxlength="4" placeholder="••••"
           onkeydown="if(event.key==='Enter'){event.preventDefault();hacerLoginLider();}">
         <button class="btn btn-primario" id="btnLoginLider" onclick="hacerLoginLider()">Continuar</button>
+
+        <!-- AGREGADO 30 sep 2026 (petición del usuario: si el líder todavía no está
+             disponible para hacer login aquí mismo, dar 2 salidas claras en vez de un
+             solo "Cancelar" ambiguo). -->
+        <p class="campo-ayuda" style="margin-top:14px;">¿El líder no está disponible ahora? Puedes seguir sin hacer login todavía:</p>
+        <button class="btn-link" onclick="volverAEscanearOtra()">Escanear otra pieza</button>
+        <button class="btn-link" onclick="volverAlMenu()">Regresar al menú</button>
       </div>
 
       <div id="bloqueChecklist" class="oculto">
@@ -281,9 +288,8 @@
         <div id="checklistCont"></div>
         <p class="checklist-vacio" id="checklistVacioMsg" hidden>Sin puntos de revisión configurados para esta etapa.</p>
         <button class="btn btn-primario" onclick="validarChecklistYContinuar()">Siguiente</button>
+        <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
       </div>
-
-      <button class="btn-link" onclick="volverAlMenu()">Cancelar</button>
     </div>
   </section>
 
@@ -351,6 +357,17 @@
       <div class="banner-error" id="errHold" hidden></div>
       <label>Folio</label>
       <input type="text" class="campo-folio" id="inFolioHold" placeholder="FOLIO">
+
+      <!-- AGREGADO 30 sep 2026 (petición del usuario: habilitar cámara QR aquí, igual
+           que en la pantalla normal de escaneo) -->
+      <button class="btn" id="btnUsarCamaraQRHold" style="background:#0f172a;color:#fff;" onclick="abrirCamaraQRHold()">Usar cámara para escanear QR</button>
+      <div id="bloqueCamaraQRHold" class="oculto" style="margin-top:14px;">
+        <video id="videoQRHold" autoplay playsinline muted style="width:100%;max-width:320px;border-radius:12px;background:#0f172a;display:block;margin:0 auto;"></video>
+        <canvas id="canvasQRHold" style="display:none;"></canvas>
+        <p class="huella-estado" id="estadoQRHold">Cargando cámara...</p>
+        <button class="btn-link" onclick="cerrarCamaraQRGenerico_()">Cancelar cámara</button>
+      </div>
+
       <label>Motivo</label>
       <textarea id="inMotivoHold" placeholder="Describe el motivo del HOLD"></textarea>
       <button class="btn btn-peligro" onclick="confirmarMarcarHold()">Poner en HOLD</button>
@@ -367,6 +384,16 @@
         <label>Folio</label>
         <input type="text" class="campo-folio" id="inFolioResolverHold" placeholder="FOLIO">
         <button class="btn btn-primario" onclick="buscarPiezaHold()">Buscar</button>
+
+        <!-- AGREGADO 30 sep 2026 (petición del usuario: habilitar cámara QR aquí, igual
+             que en la pantalla normal de escaneo) -->
+        <button class="btn" id="btnUsarCamaraQRResolverHold" style="background:#0f172a;color:#fff;" onclick="abrirCamaraQRResolverHold()">Usar cámara para escanear QR</button>
+        <div id="bloqueCamaraQRResolverHold" class="oculto" style="margin-top:14px;">
+          <video id="videoQRResolverHold" autoplay playsinline muted style="width:100%;max-width:320px;border-radius:12px;background:#0f172a;display:block;margin:0 auto;"></video>
+          <canvas id="canvasQRResolverHold" style="display:none;"></canvas>
+          <p class="huella-estado" id="estadoQRResolverHold">Cargando cámara...</p>
+          <button class="btn-link" onclick="cerrarCamaraQRGenerico_()">Cancelar cámara</button>
+        </div>
       </div>
       <div id="bloqueResolverHold" class="oculto">
         <div class="pieza-resumen" id="resumenResolverHold"></div>
@@ -717,50 +744,65 @@ function irAEscanear(titulo){
  * 100% en el navegador) para leer el código directamente de la imagen de la cámara,
  * cuadro por cuadro, y en cuanto detecta uno, llena el folio y continúa solo, igual
  * que si lo hubiera tecleado una pistola lectora.
+ * AMPLIADO 30 sep 2026 (petición del usuario: la misma cámara QR también en "Marcar
+ * HOLD" y "Liberar HOLD", que antes solo aceptaban teclear el folio a mano) —
+ * generalizado con `QR_DESTINO` (qué pantalla la está usando: sus ids de
+ * video/canvas/estado/bloque/botón/error, y qué hacer en cuanto detecta un código)
+ * en vez de los ids fijos de antes, para no repetir esta lógica 3 veces. El
+ * comportamiento de la pantalla normal de escaneo (abrirCamaraQR/cerrarCamaraQR) NO
+ * cambia — son wrappers delgados sobre la versión genérica, para no tocar nada que ya
+ * funcionaba.
  * ===================================================================================== */
 var QR_STREAM = null;
 var QR_ANIMFRAME = null;
+var QR_DESTINO = null; // { videoId, canvasId, estadoId, bloqueId, btnId, errId, inputId, onDetectado }
 
-function abrirCamaraQR(){
-  limpiarError('errEscaneo');
+function abrirCamaraQRGenerico_(destino){
+  QR_DESTINO = destino;
+  limpiarError(destino.errId);
   if (!window.jsQR) {
-    ponerError('errEscaneo','La librería de lectura de QR no cargó. Revisa que "jsQR.js" esté subido junto a esta página.');
+    ponerError(destino.errId,'La librería de lectura de QR no cargó. Revisa que "jsQR.js" esté subido junto a esta página.');
     return;
   }
-  document.getElementById('bloqueCamaraQR').className = '';
-  document.getElementById('btnUsarCamaraQR').hidden = true;
-  document.getElementById('estadoQR').textContent = 'Cargando cámara...';
+  document.getElementById(destino.bloqueId).className = '';
+  document.getElementById(destino.btnId).hidden = true;
+  document.getElementById(destino.estadoId).textContent = 'Cargando cámara...';
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function(stream){
     QR_STREAM = stream;
-    var video = document.getElementById('videoQR');
+    var video = document.getElementById(destino.videoId);
     video.srcObject = stream;
-    document.getElementById('estadoQR').textContent = 'Apunta la cámara al código QR de la pieza...';
-    QR_ANIMFRAME = requestAnimationFrame(tickCamaraQR);
+    document.getElementById(destino.estadoId).textContent = 'Apunta la cámara al código QR de la pieza...';
+    QR_ANIMFRAME = requestAnimationFrame(tickCamaraQRGenerico_);
   }).catch(function(err){
-    document.getElementById('estadoQR').textContent =
+    document.getElementById(destino.estadoId).textContent =
       'No se pudo abrir la cámara (' + (err && err.message ? err.message : err) + ').';
   });
 }
 
-function cerrarCamaraQR(){
+function cerrarCamaraQRGenerico_(){
   if (QR_ANIMFRAME) { cancelAnimationFrame(QR_ANIMFRAME); QR_ANIMFRAME = null; }
   if (QR_STREAM) { QR_STREAM.getTracks().forEach(function(t){ t.stop(); }); QR_STREAM = null; }
-  var video = document.getElementById('videoQR');
-  if (video) video.srcObject = null;
-  var bloque = document.getElementById('bloqueCamaraQR');
-  var btn = document.getElementById('btnUsarCamaraQR');
-  if (bloque) bloque.className = 'oculto';
-  if (btn) btn.hidden = false;
+  if (QR_DESTINO) {
+    var video = document.getElementById(QR_DESTINO.videoId);
+    if (video) video.srcObject = null;
+    var bloque = document.getElementById(QR_DESTINO.bloqueId);
+    var btn = document.getElementById(QR_DESTINO.btnId);
+    if (bloque) bloque.className = 'oculto';
+    if (btn) btn.hidden = false;
+  }
+  QR_DESTINO = null;
 }
 
-function tickCamaraQR(){
-  var video = document.getElementById('videoQR');
+function tickCamaraQRGenerico_(){
+  if (!QR_DESTINO) return; // la pantalla se cerró/canceló entre un cuadro y otro
+  var destino = QR_DESTINO;
+  var video = document.getElementById(destino.videoId);
   if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-    QR_ANIMFRAME = requestAnimationFrame(tickCamaraQR);
+    QR_ANIMFRAME = requestAnimationFrame(tickCamaraQRGenerico_);
     return;
   }
-  var canvas = document.getElementById('canvasQR');
+  var canvas = document.getElementById(destino.canvasId);
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   var ctx = canvas.getContext('2d');
@@ -769,13 +811,45 @@ function tickCamaraQR(){
   var codigo = jsQR(imagen.data, imagen.width, imagen.height, { inversionAttempts: 'dontInvert' });
 
   if (codigo && codigo.data && codigo.data.trim()) {
-    document.getElementById('estadoQR').textContent = 'Código detectado: ' + codigo.data;
-    document.getElementById('inFolio').value = codigo.data.trim();
-    cerrarCamaraQR();
-    escanearFolio();
+    document.getElementById(destino.estadoId).textContent = 'Código detectado: ' + codigo.data;
+    document.getElementById(destino.inputId).value = codigo.data.trim();
+    cerrarCamaraQRGenerico_();
+    if (destino.onDetectado) destino.onDetectado();
     return;
   }
-  QR_ANIMFRAME = requestAnimationFrame(tickCamaraQR);
+  QR_ANIMFRAME = requestAnimationFrame(tickCamaraQRGenerico_);
+}
+
+// Pantalla normal de escaneo — mismo comportamiento de siempre (llena el folio y
+// continúa sola, como una pistola lectora), ahora sobre la versión genérica.
+function abrirCamaraQR(){
+  abrirCamaraQRGenerico_({
+    videoId: 'videoQR', canvasId: 'canvasQR', estadoId: 'estadoQR',
+    bloqueId: 'bloqueCamaraQR', btnId: 'btnUsarCamaraQR', errId: 'errEscaneo',
+    inputId: 'inFolio', onDetectado: escanearFolio
+  });
+}
+function cerrarCamaraQR(){ cerrarCamaraQRGenerico_(); }
+
+// AGREGADO 30 sep 2026 — "Marcar HOLD": llena el folio y se queda ahí (el Supervisor
+// todavía tiene que escribir el motivo antes de poder enviar, así que no continúa
+// solo).
+function abrirCamaraQRHold(){
+  abrirCamaraQRGenerico_({
+    videoId: 'videoQRHold', canvasId: 'canvasQRHold', estadoId: 'estadoQRHold',
+    bloqueId: 'bloqueCamaraQRHold', btnId: 'btnUsarCamaraQRHold', errId: 'errHold',
+    inputId: 'inFolioHold', onDetectado: null
+  });
+}
+
+// AGREGADO 30 sep 2026 — "Liberar HOLD": llena el folio y sigue sola con "Buscar",
+// igual que la pantalla normal de escaneo.
+function abrirCamaraQRResolverHold(){
+  abrirCamaraQRGenerico_({
+    videoId: 'videoQRResolverHold', canvasId: 'canvasQRResolverHold', estadoId: 'estadoQRResolverHold',
+    bloqueId: 'bloqueCamaraQRResolverHold', btnId: 'btnUsarCamaraQRResolverHold', errId: 'errResolverHold',
+    inputId: 'inFolioResolverHold', onDetectado: buscarPiezaHold
+  });
 }
 
 function escanearFolio(){
@@ -811,9 +885,18 @@ function escanearFolio(){
 
 function resumenPiezaHtml(){
   var p = ESCANEO_ACTUAL.pieza;
+  // CORREGIDO 30 sep 2026 (petición del usuario: en etapas de Infusión que corren en
+  // paralelo — Desmolde/Curado/Trimming — "Estatus actual" se queda mostrando la
+  // última etapa que quedó COMPLETA en la pieza, no en la que se está trabajando
+  // ahora mismo, y eso confundía, ej. viendo "CURADO" mientras se libera Trimming).
+  // Se agrega "Etapa en proceso" con el departamento que de verdad se está
+  // escaneando ahora (CONTEXTO.departamento), y se deja claro que el otro dato es
+  // el último registrado, no necesariamente el actual.
+  var etapaEnProceso = (typeof CONTEXTO !== 'undefined' && CONTEXTO && CONTEXTO.departamento) ? CONTEXTO.departamento : '';
   return '<div class="folio-grande">' + ESCANEO_ACTUAL.folio + '</div>' +
     'WOINT: <b>' + (p.woint||'—') + '</b> &nbsp;·&nbsp; JOB: <b>' + (p.job||'—') + '</b><br>' +
-    'Estatus actual: <b>' + (p.estatusActual||'—') + '</b>';
+    (etapaEnProceso ? ('Etapa en proceso: <b>' + etapaEnProceso + '</b><br>') : '') +
+    'Último estatus registrado: <b>' + (p.estatusActual||'—') + '</b>';
 }
 
 /* =====================================================================================
@@ -1145,6 +1228,21 @@ function abrirPasoFormulario(){
       return HALLAZGO_CLAVES.indexOf(c.clave) !== -1;
     }).forEach(function(campo){ contHallazgo.appendChild(renderizarCampo(campo, VALORES_FORMULARIO)); });
     cont.appendChild(contHallazgo);
+
+    // AGREGADO 30 sep 2026 (petición del usuario: si la "Disposición preliminar" NO
+    // es APROBADA — es decir, APROBADA CON DESVIACION, RETRABAJO o SCRAP — el
+    // recuadro de comentarios/hallazgo debe habilitarse solo, sin que el líder tenga
+    // que acordarse de tocar aparte el toggle "¿Se encontró un hallazgo?"). Si vuelve
+    // a poner APROBADA, se deja como estaba (el líder puede seguir abriéndolo a mano
+    // con el toggle si de todos modos quiere dejar una nota).
+    var selDisposicionSupervisor = document.getElementById('campo_DISPOSICION_SUPERVISOR');
+    if (selDisposicionSupervisor) {
+      selDisposicionSupervisor.addEventListener('change', function(){
+        if (selDisposicionSupervisor.value && selDisposicionSupervisor.value !== 'APROBADA') {
+          elegirHallazgo(true);
+        }
+      });
+    }
   }
 
   mostrarPantalla('p-formulario');
