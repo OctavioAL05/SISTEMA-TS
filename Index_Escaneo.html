@@ -284,7 +284,7 @@
 
       <div id="bloqueChecklist" class="oculto">
         <p class="campo-ayuda" id="liderIdentificado"></p>
-        <h2>Revisión del líder</h2>
+        <h2 id="tituloRevisionLider">Revisión del líder</h2>
         <div id="checklistCont"></div>
         <p class="checklist-vacio" id="checklistVacioMsg" hidden>Sin puntos de revisión configurados para esta etapa.</p>
         <button class="btn btn-primario" onclick="validarChecklistYContinuar()">Siguiente</button>
@@ -1020,8 +1020,16 @@ function hacerLoginLider(){
     // o cualquiera si es Supervisor/Administrador cubriendo a un líder ausente.
     return llamarServidor('verificarLiderParaDepartamento', usuario, pin, CONTEXTO.departamento).then(function(resp){
       LIDER_SESION = resp;
+      // AGREGADO 01 oct 2026: los checkpoints intermedios (guardarCheckpointLiderInfusion)
+      // se autorizan solo con usuario+PIN, sin rostro — por eso el PIN se guarda aquí
+      // (brevemente, en memoria, nunca se manda a ningún otro lado) para poder usarlo
+      // de nuevo al guardar el checkpoint, sin volver a pedirlo. El bloque de cierre
+      // de la sección (abrirPantallaRostroInfusion) sigue sin necesitarlo.
+      LIDER_SESION.pin = pin;
       document.getElementById('liderIdentificado').textContent =
         'Líder identificado: ' + (resp.nombreLider || resp.usuario) + '.';
+      document.getElementById('tituloRevisionLider').textContent =
+        ESCANEO_ACTUAL.fase === 'CHECKPOINT' ? 'Validación intermedia del líder' : 'Revisión del líder';
       document.getElementById('bloqueLoginLider').className = 'oculto';
       document.getElementById('bloqueChecklist').className = '';
 
@@ -1070,9 +1078,13 @@ function validarChecklistYContinuar(){
   var errDisp = validarCamposObligatorios_(items, VALORES_CHECKLIST, ESCANEO_ACTUAL.flujoSecciones);
   if (errDisp) { ponerError('errLiberacion', errDisp); return; }
 
-  // AGREGADO 25 sep 2026: el flujo por secciones de Infusión no tiene pantalla de
-  // "formulario" aparte — va directo a verificación de rostro y de ahí a
-  // guardarSeccionLiderInfusion (ver abrirPantallaRostroInfusion).
+  // AGREGADO 01 oct 2026: un checkpoint intermedio de líder se guarda directo con el
+  // PIN que el líder ya usó para entrar aquí (sin rostro) — ver guardarCheckpointUI.
+  if (ESCANEO_ACTUAL.flujoSecciones && ESCANEO_ACTUAL.fase === 'CHECKPOINT') { guardarCheckpointUI(); return; }
+
+  // AGREGADO 25 sep 2026: el flujo por secciones de Infusión (bloque de cierre) no
+  // tiene pantalla de "formulario" aparte — va directo a verificación de rostro y de
+  // ahí a guardarSeccionLiderInfusion (ver abrirPantallaRostroInfusion).
   if (ESCANEO_ACTUAL.flujoSecciones) { abrirPantallaRostroInfusion(); return; }
 
   abrirPasoFormulario();
@@ -1092,6 +1104,9 @@ function abrirPasoSeccionInfusion(){
     VALORES_BITACORA = {};
     abrirTecnicoInfusion();
   } else {
+    // AGREGADO 01 oct 2026: tanto un checkpoint intermedio ('CHECKPOINT') como el
+    // bloque de cierre ('LIDER') reutilizan la MISMA pantalla p-liberacion — la
+    // diferencia (rostro sí/no) se decide después, en validarChecklistYContinuar.
     VALORES_CHECKLIST = {};
     abrirPasoLiberacion();
   }
@@ -1133,6 +1148,9 @@ function guardarSeccionTecnicoUI(){
   var payload = {
     folio: ESCANEO_ACTUAL.folio, departamento: CONTEXTO.departamento,
     seccionClave: ESCANEO_ACTUAL.seccionClave, intento: ESCANEO_ACTUAL.intento,
+    // AGREGADO 01 oct 2026: qué tramo de la sección es este (0 = el primero, igual
+    // que siempre) — ver guardarSeccionTecnicoInfusion en Escaneo.gs.
+    tramoIndice: ESCANEO_ACTUAL.tramoIndice || 0,
     camposTecnico: VALORES_BITACORA
   };
   var folioGuardado = ESCANEO_ACTUAL.folio;
@@ -1154,6 +1172,35 @@ function guardarSeccionTecnicoUI(){
           .then(function(resp){ ESCANEO_ACTUAL = resp; abrirPasoSeccionInfusion(); });
       })
       .catch(function(err){ ponerError('errBitacora', err); });
+  });
+}
+
+/** AGREGADO 01 oct 2026 — guarda un CHECKPOINT intermedio de líder: a diferencia del
+ *  bloque de cierre (abrirPantallaRostroInfusion), este NUNCA pasa por la pantalla de
+ *  rostro — se autoriza solo con el usuario+PIN con el que el líder ya inició sesión
+ *  en esta misma pantalla (LIDER_SESION.pin, ver hacerLoginLider). Petición explícita
+ *  del usuario: "que se puedan liberar solo con usuario y contraseña y sin la
+ *  validación de rostro". Después de guardar, siempre vuelve a pedir el siguiente
+ *  paso con iniciarEscaneo — sea el reintento del tramo anterior (RW) o el siguiente
+ *  tramo (A) — sin pantalla de "éxito" intermedia, igual que encadena el técnico. */
+function guardarCheckpointUI(){
+  if (!LIDER_SESION || !LIDER_SESION.pin) { ponerError('errLiberacion','Falta el login del líder (paso anterior).'); return; }
+  var payload = {
+    folio: ESCANEO_ACTUAL.folio, departamento: CONTEXTO.departamento,
+    seccionClave: ESCANEO_ACTUAL.seccionClave, checkpointIndice: ESCANEO_ACTUAL.checkpointIndice,
+    intento: ESCANEO_ACTUAL.intento, idUsuario: LIDER_SESION.usuario, pin: LIDER_SESION.pin,
+    camposLider: VALORES_CHECKLIST
+  };
+  var folioGuardado = ESCANEO_ACTUAL.folio;
+  var deptoGuardado = CONTEXTO.departamento;
+  var btn = document.querySelector('#bloqueChecklist .btn-primario');
+  conBotonCargando(btn, 'Guardando...', function(){
+    return llamarServidor('guardarCheckpointLiderInfusion', payload)
+      .then(function(){
+        return llamarServidor('iniciarEscaneo', folioGuardado, deptoGuardado)
+          .then(function(resp){ ESCANEO_ACTUAL = resp; abrirPasoSeccionInfusion(); });
+      })
+      .catch(function(err){ ponerError('errLiberacion', err); });
   });
 }
 
