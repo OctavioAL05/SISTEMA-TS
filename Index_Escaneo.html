@@ -64,6 +64,9 @@
     .banner-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-size:13.5px;
       padding:11px 13px;border-radius:10px;margin-bottom:14px;line-height:1.4;}
     .banner-ok[hidden]{display:none;}
+    /* AGREGADO 06 oct 2026 — INF2 (bitácora de pares): aviso de la otra pieza del par */
+    .banner-par{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;
+      padding:9px 12px;border-radius:10px;margin:10px 0 4px;line-height:1.45;}
 
     .stepper{display:flex;align-items:center;gap:6px;margin-bottom:18px;}
     .stepper .paso{flex:1;height:5px;border-radius:3px;background:var(--borde);}
@@ -896,7 +899,29 @@ function resumenPiezaHtml(){
   return '<div class="folio-grande">' + ESCANEO_ACTUAL.folio + '</div>' +
     'WOINT: <b>' + (p.woint||'—') + '</b> &nbsp;·&nbsp; JOB: <b>' + (p.job||'—') + '</b><br>' +
     (etapaEnProceso ? ('Etapa en proceso: <b>' + etapaEnProceso + '</b><br>') : '') +
-    'Último estatus registrado: <b>' + (p.estatusActual||'—') + '</b>';
+    'Último estatus registrado: <b>' + (p.estatusActual||'—') + '</b>' +
+    avisoParHtml_();
+}
+
+/* AGREGADO 06 oct 2026 — INF2 (bitácora de pares): si la pieza escaneada forma par con
+ * otra (mismo WOINT y JOB, distinto NO. PARTE), muestra cuál es la otra y si el paso
+ * actual es COMPARTIDO (se captura una sola vez para las 2). El backend manda `par`
+ * (ver infoParParaRespuesta_ en Escaneo.gs); en INF1 y demás viene null y no se muestra. */
+function avisoParHtml_(){
+  var par = ESCANEO_ACTUAL && ESCANEO_ACTUAL.par;
+  if (!par) return '';
+  var esc = function(t){ return String(t === undefined || t === null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;'); };
+  var html = '<div class="banner-par"><b>Pieza ' + esc(par.noParteEsta) + '</b> · forma par con <b>' + esc(par.noParteSocio) +
+    '</b> (folio ' + esc(par.folioSocio) + ')';
+  if (par.socioScrap) {
+    html += '<br>La otra pieza está en <b>SCRAP</b>: los pasos del par aplican solo a esta pieza.';
+  } else if (par.pasoCompartido) {
+    html += '<br><b>Paso compartido:</b> se captura <b>una sola vez</b> y vale para las 2 piezas' +
+      (par.ejecutaEnOtroFolio ? ' (queda registrado en el folio ' + esc(par.folioSocio) + ')' : '') + '.';
+  } else {
+    html += '<br>Este paso es <b>solo de esta pieza</b>.';
+  }
+  return html + '</div>';
 }
 
 /* =====================================================================================
@@ -1100,6 +1125,12 @@ function validarChecklistYContinuar(){
  * Escaneo.gs.
  * ===================================================================================== */
 function abrirPasoSeccionInfusion(){
+  // AGREGADO 06 oct 2026 (INF2): la otra pieza del par ya cerró un paso compartido que
+  // esta no tenía y el backend lo adoptó al escanear -> no hay nada más que capturar.
+  if (ESCANEO_ACTUAL.etapaYaCompleta) {
+    mostrarExito('Etapa completa', ESCANEO_ACTUAL.mensajePar || ('Folio ' + ESCANEO_ACTUAL.folio + ' ya completó esta etapa.'));
+    return;
+  }
   if (ESCANEO_ACTUAL.fase === 'TECNICO') {
     VALORES_BITACORA = {};
     abrirTecnicoInfusion();
@@ -1225,7 +1256,16 @@ function manejarResultadoSeccionLiderInfusion(resp){
     llamarServidor('iniciarEscaneo', folio, depto).then(function(resp2){
       ESCANEO_ACTUAL = resp2;
       abrirPasoSeccionInfusion();
-    }).catch(function(err){ ponerError('errRostro', err); });
+    }).catch(function(err){
+      // AGREGADO 06 oct 2026 (INF2): si la sección SÍ quedó liberada pero el siguiente paso
+      // es compartido y la otra pieza todavía no llega a él, el backend rechaza el
+      // re-escaneo con el motivo — no es un error: se muestra como aviso de éxito.
+      if (resp.resultado === 'SIGUIENTE_SECCION') {
+        mostrarExito('Sección liberada', 'Folio ' + folio + ' quedó liberado. ' + err);
+      } else {
+        ponerError('errRostro', err);
+      }
+    });
     return;
   }
   if (resp.resultado === 'ETAPA_COMPLETA') {
@@ -1261,11 +1301,25 @@ function abrirPasoFormulario(){
 
   var cont = document.getElementById('camposFormularioCont');
   cont.innerHTML = '';
+  // AGREGADO 02 oct 2026 — "Liberación de Calidad": el servidor puede marcar claves
+  // que YA NO deben preguntarse aquí porque se derivan solas del checklist
+  // hoja-driven de la bitácora (ver camposFormularioOmitir en Escaneo.gs,
+  // iniciarEscaneo) — hoy solo pasa con DISPOSICION_FINAL de INSPECCION CALIDAD,
+  // cuando la hoja (ej. INF1, Sección 9) ya trae su propio renglón final de
+  // disposición.
+  var omitirFormulario = ESCANEO_ACTUAL.camposFormularioOmitir || [];
   var campos = (ESCANEO_ACTUAL.camposFormulario || []).filter(function(c){
-    return !(esInspeccionSupervisor && HALLAZGO_CLAVES.indexOf(c.clave) !== -1);
+    return !(esInspeccionSupervisor && HALLAZGO_CLAVES.indexOf(c.clave) !== -1) &&
+      omitirFormulario.indexOf(c.clave) === -1;
   });
-  document.getElementById('notaFormularioVacia').hidden = (ESCANEO_ACTUAL.camposFormulario || []).length > 0;
+  document.getElementById('notaFormularioVacia').hidden = campos.length > 0;
   campos.forEach(function(campo){ cont.appendChild(renderizarCampo(campo, VALORES_FORMULARIO)); });
+  if (omitirFormulario.indexOf('DISPOSICION_FINAL') !== -1) {
+    var avisoDerivado = document.createElement('div');
+    avisoDerivado.className = 'campo-nota';
+    avisoDerivado.textContent = 'La disposición homologada ya quedó determinada por el checklist de Liberación de Calidad que acabas de llenar — no se vuelve a preguntar aquí.';
+    cont.appendChild(avisoDerivado);
+  }
 
   if (esInspeccionSupervisor) {
     var contHallazgo = document.createElement('div');
