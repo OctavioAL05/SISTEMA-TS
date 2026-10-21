@@ -918,6 +918,11 @@ function avisoParHtml_(){
   } else if (par.pasoCompartido) {
     html += '<br><b>Paso compartido:</b> se captura <b>una sola vez</b> y vale para las 2 piezas' +
       (par.ejecutaEnOtroFolio ? ' (queda registrado en el folio ' + esc(par.folioSocio) + ')' : '') + '.';
+    var hayDobles = ((ESCANEO_ACTUAL && ESCANEO_ACTUAL.camposSeccion) || []).some(function(c){ return !!c.piezaIdx; });
+    if (hayDobles) {
+      html += '<br>Las preguntas con el No. Parte entre corchetes se contestan <b>por cada pieza</b> (franja azul / ámbar); ' +
+        'la liberación del técnico y del líder es <b>una sola</b> para las 2.';
+    }
   } else {
     html += '<br>Este paso es <b>solo de esta pieza</b>.';
   }
@@ -1182,6 +1187,9 @@ function guardarSeccionTecnicoUI(){
     // AGREGADO 01 oct 2026: qué tramo de la sección es este (0 = el primero, igual
     // que siempre) — ver guardarSeccionTecnicoInfusion en Escaneo.gs.
     tramoIndice: ESCANEO_ACTUAL.tramoIndice || 0,
+    // AGREGADO 21 oct 2026: correo/USUARIO del equipo que hace la etapa — el servidor lo
+    // estampa en DATOS_BITACORA para que BDD_EVENTOS lleve el correo igual que el Form.
+    idUsuario: (SESION && SESION.usuario) || '',
     camposTecnico: VALORES_BITACORA
   };
   var folioGuardado = ESCANEO_ACTUAL.folio;
@@ -1534,6 +1542,13 @@ function autorizarConAdminYFinalizar(){
  * ===================================================================================== */
 function renderizarCampo(campo, bolsaValores){
   var wrap = document.createElement('div');
+  // AGREGADO 06 oct 2026 — INF2 (ALCANCE 'DOBLE'): la misma pregunta sale una vez por pieza
+  // del par; cada una lleva una franja de color (azul = 1a pieza, ámbar = 2a) y su No. Parte
+  // en la etiqueta (la pone el backend, ver expandirCamposPorPieza_ en Escaneo.gs).
+  if (campo.piezaIdx) {
+    wrap.style.borderLeft = '4px solid ' + (campo.piezaIdx === 1 ? '#2563eb' : '#d97706');
+    wrap.style.paddingLeft = '10px';
+  }
 
   // AGREGADO 23 sep 2026: tipo 'seccion' — solo un separador visual (título de
   // sub-etapa, ej. "Limpieza y Tratamiento de Molde"/"Preparación de Resina"/
