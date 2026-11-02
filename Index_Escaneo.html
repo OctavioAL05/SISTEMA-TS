@@ -162,13 +162,31 @@
 
       <div id="bloqueLoginPin" class="oculto">
         <label>PIN</label>
-        <input type="password" id="inLoginPin" inputmode="numeric" maxlength="4" placeholder="••••"
+        <input type="password" id="inLoginPin" inputmode="numeric" maxlength="6" placeholder="••••"
           onkeydown="if(event.key==='Enter'){event.preventDefault();hacerLoginPin();}">
         <button class="btn btn-primario" id="btnLogin" onclick="hacerLoginPin()">Entrar</button>
         <button class="btn-link" onclick="cambiarUsuarioLogin()">Cambiar de usuario</button>
       </div>
 
-      <button class="btn-link" onclick="mostrarPantalla('p-reset-pin')">¿Necesitas dar de alta o resetear un PIN?</button>
+      <p class="campo-ayuda" style="margin-top:14px;">Equipos y líderes: PIN de 4 dígitos. Administradores: PIN de 6 dígitos.<br>
+        Si olvidaste tu PIN, acude con Octavio Medina para restablecerlo.</p>
+      <button class="btn-link" onclick="mostrarPantalla('p-reset-pin')">Restablecer un PIN (lo hace el Administrador)</button>
+    </div>
+  </section>
+
+  <!-- ============== PANTALLA: CAMBIO OBLIGATORIO DE PIN (administrador con PIN de menos de 6 dígitos) ============== -->
+  <section id="p-cambio-pin" class="pantalla">
+    <div class="tarjeta">
+      <h1>Define tu nuevo PIN</h1>
+      <p class="subt">Tu PIN actual es de menos de 6 dígitos. Las cuentas de administrador usan un PIN de 6 dígitos (el mismo para la tablet, Huellas y los dashboards).</p>
+      <div class="banner-error" id="errCambioPin" hidden></div>
+      <label>PIN nuevo (6 dígitos)</label>
+      <input type="password" id="inCambioPin1" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••">
+      <label>Confirma el PIN nuevo</label>
+      <input type="password" id="inCambioPin2" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCambioPin();}">
+      <button class="btn btn-primario" id="btnCambioPin" onclick="guardarCambioPin()">Guardar y entrar</button>
+      <button class="btn-link" onclick="cancelarCambioPin()">Cancelar</button>
     </div>
   </section>
 
@@ -182,8 +200,8 @@
 
       <label>Usuario a dar de alta / resetear</label>
       <input type="text" id="inResetObjetivo" placeholder="equipo@dominio.com">
-      <label>Nuevo PIN (4 dígitos)</label>
-      <input type="password" id="inResetNuevoPin" inputmode="numeric" maxlength="4" placeholder="••••">
+      <label>Nuevo PIN (4 dígitos para equipos y líderes; 6 para administradores)</label>
+      <input type="password" id="inResetNuevoPin" inputmode="numeric" maxlength="6" placeholder="••••">
 
       <p class="campo-ayuda">Todos (técnico, líder, Supervisor, Calidad, Administrador) usan PIN para iniciar
         sesión. El rostro de líderes/Supervisor/Calidad se registra aparte (pídelo al Administrador).</p>
@@ -196,8 +214,8 @@
       <div id="bloqueResetAdmin">
         <label>Usuario del Administrador que autoriza</label>
         <input type="text" id="inResetAdminUsuario" placeholder="admin@dominio.com">
-        <label>PIN del Administrador</label>
-        <input type="password" id="inResetAdminPin" inputmode="numeric" maxlength="4" placeholder="••••">
+        <label>PIN del Administrador (6 dígitos)</label>
+        <input type="password" id="inResetAdminPin" inputmode="numeric" maxlength="6" placeholder="••••">
       </div>
       <div id="bloqueResetMaestra" class="oculto">
         <label>Clave maestra de arranque</label>
@@ -273,7 +291,7 @@
         <label>Usuario del líder</label>
         <input type="text" id="inLiderUsuario" autocomplete="off" placeholder="usuario del líder">
         <label>PIN del líder</label>
-        <input type="password" id="inLiderPin" inputmode="numeric" maxlength="4" placeholder="••••"
+        <input type="password" id="inLiderPin" inputmode="numeric" maxlength="6" placeholder="••••"
           onkeydown="if(event.key==='Enter'){event.preventDefault();hacerLoginLider();}">
         <button class="btn btn-primario" id="btnLoginLider" onclick="hacerLoginLider()">Continuar</button>
 
@@ -312,7 +330,7 @@
         <label>Usuario del Administrador</label>
         <input type="text" id="inOverrideUsuario" placeholder="admin@dominio.com">
         <label>PIN del Administrador</label>
-        <input type="password" id="inOverridePin" inputmode="numeric" maxlength="4" placeholder="••••">
+        <input type="password" id="inOverridePin" inputmode="numeric" maxlength="6" placeholder="••••">
         <button class="btn btn-ambar" onclick="autorizarConAdminYFinalizar()">Autorizar y enviar</button>
       </div>
     </div>
@@ -491,8 +509,10 @@ function cargarModelosRostro(){
  * ===================================================================================== */
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGqD22nBUZHRI1cpIrldlm8GycqUo3k8HVYcwptYB8ll40UtHFmdRR_wcNwcV-lGOB/exec';
 
+var CODIGO_ERROR = null; // codigo del último error del servidor (ej. 'CAMBIO_PIN')
 function llamarServidor(nombreFn){
   var args = Array.prototype.slice.call(arguments, 1);
+  CODIGO_ERROR = null;
   return fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     // text/plain a propósito: evita que el navegador mande un preflight OPTIONS
@@ -502,7 +522,7 @@ function llamarServidor(nombreFn){
   })
     .then(function(r){ return r.json(); })
     .then(function(resp){
-      if (resp && resp.ok === false) { throw new Error(resp.error || 'Error desconocido.'); }
+      if (resp && resp.ok === false) { CODIGO_ERROR = resp.codigo || null; throw new Error(resp.error || 'Error desconocido.'); }
       return resp;
     })
     .catch(function(err){
@@ -572,7 +592,7 @@ function continuarLogin(){
   conBotonCargando(btn, 'Verificando...', function(){
     return llamarServidor('iniciarSesion', usuario).then(function(resp){
       USUARIO_LOGIN_EN_CURSO = usuario;
-      document.getElementById('loginSubt').textContent = 'Escribe tu PIN.';
+      document.getElementById('loginSubt').textContent = 'Escribe tu PIN' + (resp && resp.longitudPin ? ' de ' + resp.longitudPin + ' dígitos.' : '.');
       mostrarBloqueLogin('bloqueLoginPin');
       setTimeout(function(){ document.getElementById('inLoginPin').focus(); }, 50);
     }).catch(function(err){ ponerError('errLogin', err); });
@@ -594,7 +614,45 @@ function hacerLoginPin(){
       USUARIO_LOGIN_EN_CURSO = null;
       actualizarHeaderSesion();
       irAMenu();
-    }).catch(function(err){ ponerError('errLogin', err); });
+    }).catch(function(err){
+      if (CODIGO_ERROR === 'CAMBIO_PIN') {
+        CAMBIO_PIN_CTX = { usuario: usuario, pinActual: pin };
+        document.getElementById('inCambioPin1').value = ''; document.getElementById('inCambioPin2').value = '';
+        limpiarError('errCambioPin');
+        mostrarPantalla('p-cambio-pin');
+        return;
+      }
+      ponerError('errLogin', err);
+    });
+  });
+}
+
+/* ---- Cambio obligatorio de PIN (administrador con PIN de menos de 6 dígitos) ---- */
+var CAMBIO_PIN_CTX = null;
+function cancelarCambioPin(){
+  CAMBIO_PIN_CTX = null;
+  document.getElementById('inLoginPin').value = '';
+  mostrarPantalla('p-login');
+}
+function guardarCambioPin(){
+  limpiarError('errCambioPin');
+  var ctx = CAMBIO_PIN_CTX; if (!ctx) { mostrarPantalla('p-login'); return; }
+  var n1 = document.getElementById('inCambioPin1').value.trim();
+  var n2 = document.getElementById('inCambioPin2').value.trim();
+  if (!/^\d{6}$/.test(n1)) { ponerError('errCambioPin', 'El PIN debe ser de exactamente 6 dígitos.'); return; }
+  if (n1 !== n2) { ponerError('errCambioPin', 'La confirmación no coincide con el PIN nuevo.'); return; }
+  conBotonCargando(document.getElementById('btnCambioPin'), 'Guardando...', function(){
+    return llamarServidor('cambiarPinPropio', ctx.usuario, ctx.pinActual, n1).then(function(){
+      return llamarServidor('verificarPIN', ctx.usuario, n1);
+    }).then(function(resp){
+      CAMBIO_PIN_CTX = null;
+      SESION = resp;
+      document.getElementById('inCambioPin1').value = ''; document.getElementById('inCambioPin2').value = '';
+      document.getElementById('inLoginUsuario').value = ''; document.getElementById('inLoginPin').value = '';
+      USUARIO_LOGIN_EN_CURSO = null;
+      actualizarHeaderSesion();
+      irAMenu();
+    }).catch(function(err){ ponerError('errCambioPin', err); });
   });
 }
 
