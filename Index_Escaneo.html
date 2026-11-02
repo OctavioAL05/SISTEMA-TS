@@ -31,6 +31,7 @@
       width:100%;max-width:480px;padding:22px 20px;}
     .pantalla{width:100%;max-width:480px;}
     .pantalla[hidden]{display:none;}
+    button[hidden], video[hidden]{display:none !important;}
 
     h1{font-size:19px;margin:0 0 4px;}
     h2{font-size:16px;margin:0 0 14px;color:var(--texto);}
@@ -323,13 +324,24 @@
       <video id="videoRostro" autoplay playsinline muted style="width:100%;max-width:320px;border-radius:12px;background:#0f172a;"></video>
       <p class="huella-estado" id="rostroEstado">Cargando cámara...</p>
       <button class="btn btn-primario" id="btnCapturarRostro" onclick="capturarYVerificarRostro()">Capturar</button>
+      <button class="btn-link" id="btnUsarPinPropio" onclick="mostrarConfirmarPinPropio(true)" hidden>Confirmar con mi PIN en lugar del rostro</button>
+
+      <!-- Administrador / Supervisor / Calidad: confirman con su PIN personal (misma persona que
+           inició la etapa) en vez del rostro. Cuentas sin rostro registrado entran directo aquí. -->
+      <div id="bloqueConfirmarPin" class="oculto" style="margin-top:14px;">
+        <label>Tu PIN (6 dígitos)</label>
+        <input type="password" id="inConfirmarPin" inputmode="numeric" maxlength="6" placeholder="••••••">
+        <button class="btn btn-primario" onclick="confirmarConPinPropio()">Confirmar y enviar</button>
+        <button class="btn-link" id="btnVolverARostro" onclick="mostrarConfirmarPinPropio(false)">Usar rostro</button>
+      </div>
+
       <button class="btn-link" onclick="cancelarVerificacionRostro()">Cancelar</button>
 
       <div id="bloqueOverrideAdmin" class="oculto" style="margin-top:14px;">
-        <p class="campo-ayuda">No coincidió 3 veces. Solo el Administrador puede autorizar este envío.</p>
-        <label>Usuario del Administrador</label>
-        <input type="text" id="inOverrideUsuario" placeholder="admin@dominio.com">
-        <label>PIN del Administrador</label>
+        <p class="campo-ayuda" id="txtOverrideAdmin">No coincidió 3 veces. Solo el Administrador, o un Supervisor en etapas de producción, puede autorizar este envío.</p>
+        <label>Usuario del Administrador o Supervisor</label>
+        <input type="text" id="inOverrideUsuario" placeholder="usuario">
+        <label>PIN</label>
         <input type="password" id="inOverridePin" inputmode="numeric" maxlength="6" placeholder="••••">
         <button class="btn btn-ambar" onclick="autorizarConAdminYFinalizar()">Autorizar y enviar</button>
       </div>
@@ -661,7 +673,7 @@ function actualizarHeaderSesion(){
   var info = document.getElementById('infoSesion');
   var btnSalir = document.getElementById('btnSalir');
   if (!SESION){ lbl.textContent = 'Sin sesión'; info.textContent=''; btnSalir.hidden = true; return; }
-  lbl.textContent = SESION.esCoordinador ? 'Administrador' : (SESION.esAdmin ? 'Supervisor / Calidad' : (SESION.rolDepartamento || ''));
+  lbl.textContent = SESION.esAdmin ? nombreRolSuperior_(SESION.rolSuperior) : (SESION.rolDepartamento || '');
   info.innerHTML = '<b>' + SESION.usuario + '</b>' + (SESION.equipoId ? SESION.equipoId : '');
   btnSalir.hidden = false;
 }
@@ -743,20 +755,38 @@ function irAMenu(){
       }));
     }
   } else {
-    titulo.textContent = 'Supervisor / Calidad';
+    // REESTRUCTURA DE ROLES (nov 2026): el menú depende del rol superior de la cuenta
+    // (SESION.rolSuperior, viene del backend: ADMINISTRADOR / SUPERVISOR / CALIDAD).
+    //  - ADMINISTRADOR (una sola cuenta): entregar, inspección Supervisor, inspección Calidad, HOLD, liberar HOLD.
+    //  - SUPERVISOR: entregar, inspección Supervisor, HOLD, liberar HOLD.
+    //  - CALIDAD: inspección Calidad, HOLD, liberar HOLD.
+    var rol = SESION.rolSuperior || '';
+    titulo.textContent = nombreRolSuperior_(rol);
     subt.textContent = SESION.usuario;
-    lista.appendChild(botonMenu('Entregar piezas a producción', function(){
-      CONTEXTO = { modo:'programada' };
-      irAEscanear('Entregar a producción (PROGRAMADA)');
-    }));
-    lista.appendChild(botonMenu('Inspección de Supervisor', function(){
-      CONTEXTO = { modo:'inspeccion', departamento:'INSPECCION SUPERVISOR' };
-      irAEscanear('Inspección de Supervisor');
-    }));
-    lista.appendChild(botonMenu('Inspección de Calidad', function(){
-      CONTEXTO = { modo:'inspeccion', departamento:'INSPECCION CALIDAD' };
-      irAEscanear('Inspección de Calidad');
-    }));
+    if (!rol) {
+      var aviso = document.createElement('p');
+      aviso.className = 'campo-ayuda';
+      aviso.textContent = 'Esta cuenta no tiene un rol válido (Administrador, Supervisor o Calidad). Pide al Administrador que revise su ROL_DEPARTAMENTO en USUARIOS_EQUIPO.';
+      lista.appendChild(aviso);
+      mostrarPantalla('p-menu');
+      return;
+    }
+    if (rol === 'ADMINISTRADOR' || rol === 'SUPERVISOR') {
+      lista.appendChild(botonMenu('Entregar piezas a producción', function(){
+        CONTEXTO = { modo:'programada' };
+        irAEscanear('Entregar a producción (PROGRAMADA)');
+      }));
+      lista.appendChild(botonMenu('Inspección de Supervisor', function(){
+        CONTEXTO = { modo:'inspeccion', departamento:'INSPECCION SUPERVISOR' };
+        irAEscanear('Inspección de Supervisor');
+      }));
+    }
+    if (rol === 'ADMINISTRADOR' || rol === 'CALIDAD') {
+      lista.appendChild(botonMenu('Inspección de Calidad', function(){
+        CONTEXTO = { modo:'inspeccion', departamento:'INSPECCION CALIDAD' };
+        irAEscanear('Inspección de Calidad');
+      }));
+    }
     lista.appendChild(botonMenu('Marcar HOLD', function(){
       document.getElementById('inFolioHold').value = '';
       document.getElementById('inMotivoHold').value = '';
@@ -772,6 +802,10 @@ function irAMenu(){
     }, 'btn-ambar'));
   }
   mostrarPantalla('p-menu');
+}
+
+function nombreRolSuperior_(rol){
+  return rol === 'ADMINISTRADOR' ? 'Administrador' : rol === 'SUPERVISOR' ? 'Supervisor' : rol === 'CALIDAD' ? 'Calidad' : 'Cuenta sin rol';
 }
 
 function botonMenu(texto, onClick, clase){
@@ -932,7 +966,7 @@ function escanearFolio(){
 
   // modo 'team' o 'inspeccion': arranca el flujo de 3 pasos
   conBotonCargando(btn, 'Buscando...', function(){
-    return llamarServidor('iniciarEscaneo', folio, CONTEXTO.departamento).then(function(resp){
+    return llamarServidor('iniciarEscaneo', folio, CONTEXTO.departamento, CONTEXTO.modo === 'inspeccion' ? SESION.usuario : undefined).then(function(resp){
       ESCANEO_ACTUAL = resp;
       VALORES_BITACORA = {}; VALORES_CHECKLIST = {}; VALORES_FORMULARIO = {}; LIDER_SESION = null;
       // AGREGADO 25 sep 2026: Infusión (LAMINADO/CURADO/DESMOLDE/TRIMMING) usa el
@@ -1482,7 +1516,23 @@ function abrirPantallaRostro(idUsuarioObjetivo, payloadPendiente, modo){
   document.getElementById('btnCapturarRostro').hidden = false;
   document.getElementById('rostroSubt').textContent = 'Mira a la cámara y toca "Capturar".';
   document.getElementById('rostroEstado').textContent = 'Cargando cámara...';
+  document.getElementById('inConfirmarPin').value = '';
+  // Texto del override según la etapa: en inspecciones solo el Administrador puede anular.
+  var esInsp = ETAPAS_INSPECCION_UI.indexOf(String(CONTEXTO.departamento || '')) !== -1;
+  document.getElementById('txtOverrideAdmin').textContent = esInsp
+    ? 'No coincidió 3 veces. Solo el Administrador puede autorizar este envío.'
+    : 'No coincidió 3 veces. Solo el Administrador, o un Supervisor, puede autorizar este envío.';
+  var cuenta = cuentaConfirmante_(idUsuarioObjetivo);
+  var puedePin = !!(cuenta && (cuenta.rolSuperior === 'ADMINISTRADOR' || cuenta.rolSuperior === 'SUPERVISOR' || cuenta.rolSuperior === 'CALIDAD'));
+  ROSTRO_CONTEXTO.puedePin = puedePin;
+  document.getElementById('btnUsarPinPropio').hidden = !puedePin;
   mostrarPantalla('p-rostro');
+  // Cuenta superior SIN rostro registrado: no hay nada que verificar con cámara, va directo al PIN.
+  if (puedePin && cuenta.tieneRostro === false) {
+    mostrarConfirmarPinPropio(true, true);
+    return;
+  }
+  mostrarConfirmarPinPropio(false);
 
   var video = document.getElementById('videoRostro');
   Promise.all([
@@ -1496,6 +1546,82 @@ function abrirPantallaRostro(idUsuarioObjetivo, payloadPendiente, modo){
     document.getElementById('rostroEstado').textContent =
       'No se pudo abrir la cámara (' + (err && err.message ? err.message : err) + ').';
   });
+}
+
+var ETAPAS_INSPECCION_UI = ['INSPECCION SUPERVISOR', 'INSPECCION CALIDAD'];
+
+// Cuenta (SESION o LIDER_SESION) que corresponde al usuario contra el que se confirma.
+function cuentaConfirmante_(idUsuario){
+  var id = String(idUsuario || '').trim().toLowerCase();
+  if (SESION && String(SESION.usuario).trim().toLowerCase() === id) return SESION;
+  if (LIDER_SESION && String(LIDER_SESION.usuario).trim().toLowerCase() === id) return LIDER_SESION;
+  return null;
+}
+
+// Alterna entre cámara (rostro) y confirmación con PIN propio. `sinCamara` = cuenta sin rostro registrado.
+function mostrarConfirmarPinPropio(mostrar, sinCamara){
+  var bloque = document.getElementById('bloqueConfirmarPin');
+  var video = document.getElementById('videoRostro');
+  if (mostrar) {
+    detenerCamaraRostro();
+    bloque.className = '';
+    video.hidden = true;
+    document.getElementById('btnCapturarRostro').hidden = true;
+    document.getElementById('btnUsarPinPropio').hidden = true;
+    document.getElementById('btnVolverARostro').hidden = !!sinCamara;
+    document.getElementById('rostroEstado').textContent = '';
+    document.getElementById('rostroSubt').textContent = sinCamara
+      ? 'Tu cuenta no tiene rostro registrado: confirma con tu PIN.'
+      : 'Confirma con tu PIN personal.';
+    setTimeout(function(){ document.getElementById('inConfirmarPin').focus(); }, 50);
+  } else {
+    var estabaEnPin = bloque.className.indexOf('oculto') === -1;
+    bloque.className = 'oculto';
+    video.hidden = false;
+    document.getElementById('btnCapturarRostro').hidden = false;
+    document.getElementById('btnUsarPinPropio').hidden = !(ROSTRO_CONTEXTO && ROSTRO_CONTEXTO.puedePin);
+    document.getElementById('rostroSubt').textContent = 'Mira a la cámara y toca "Capturar".';
+    if (estabaEnPin && ROSTRO_CONTEXTO) {
+      // regresó desde PIN: reabrir la cámara
+      document.getElementById('rostroEstado').textContent = 'Cargando cámara...';
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }).then(function(stream){
+        ROSTRO_STREAM = stream;
+        video.srcObject = stream;
+        document.getElementById('rostroEstado').textContent = 'Listo. Mira a la cámara y toca "Capturar".';
+      }).catch(function(err){
+        document.getElementById('rostroEstado').textContent = 'No se pudo abrir la cámara (' + (err && err.message ? err.message : err) + ').';
+      });
+    }
+  }
+}
+
+// Manda lo pendiente con un ticket ya autorizado (rostro, PIN propio o anulación) — flujo común.
+function enviarConTicketAutorizado_(ticket, textoAutorizado){
+  ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = ticket;
+  if (ROSTRO_CONTEXTO.modo === 'INFUSION_LIDER') {
+    return llamarServidor('guardarSeccionLiderInfusion', ROSTRO_CONTEXTO.payloadPendiente).then(manejarResultadoSeccionLiderInfusion);
+  }
+  return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente).then(function(){
+    mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + textoAutorizado + '.');
+  });
+}
+
+function confirmarConPinPropio(){
+  limpiarError('errRostro');
+  var pin = document.getElementById('inConfirmarPin').value.trim();
+  if (!pin) { ponerError('errRostro','Escribe tu PIN.'); return; }
+  var cuenta = cuentaConfirmante_(ROSTRO_CONTEXTO.idUsuarioObjetivo);
+  if (!cuenta) { ponerError('errRostro','No se pudo identificar la cuenta que confirma.'); return; }
+  llamarServidor('autorizarConPinPropio', {
+    idUsuario: cuenta.usuario,
+    pin: pin,
+    idUsuarioObjetivo: ROSTRO_CONTEXTO.idUsuarioObjetivo,
+    folio: ROSTRO_CONTEXTO.payloadPendiente.folio,
+    departamento: ROSTRO_CONTEXTO.departamento
+  }).then(function(resp){
+    detenerCamaraRostro();
+    return enviarConTicketAutorizado_(resp.ticketAutorizacion, ' (confirmado con PIN)');
+  }).catch(function(err){ ponerError('errRostro', err); });
 }
 
 function detenerCamaraRostro(){
@@ -1539,13 +1665,7 @@ function capturarYVerificarRostro(){
             if (resp.coincide) {
               estado.textContent = 'Rostro verificado. Enviando...';
               detenerCamaraRostro();
-              ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = resp.ticketAutorizacion;
-              if (ROSTRO_CONTEXTO.modo === 'INFUSION_LIDER') {
-                return llamarServidor('guardarSeccionLiderInfusion', ROSTRO_CONTEXTO.payloadPendiente).then(manejarResultadoSeccionLiderInfusion);
-              }
-              return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente).then(function(){
-                mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + '.');
-              });
+              return enviarConTicketAutorizado_(resp.ticketAutorizacion, '');
             }
             if (resp.requiereAdmin) {
               // CORREGIDO 23 sep 2026: antes "sin rostro registrado" (ej. la propia
@@ -1570,7 +1690,7 @@ function autorizarConAdminYFinalizar(){
   limpiarError('errRostro');
   var usuarioAdmin = document.getElementById('inOverrideUsuario').value.trim();
   var pinAdmin = document.getElementById('inOverridePin').value.trim();
-  if (!usuarioAdmin || !pinAdmin) { ponerError('errRostro','Escribe usuario y PIN del Administrador.'); return; }
+  if (!usuarioAdmin || !pinAdmin) { ponerError('errRostro','Escribe usuario y PIN del Administrador o Supervisor.'); return; }
 
   llamarServidor('autorizarConAdmin', {
     idUsuarioAdmin: usuarioAdmin,
@@ -1580,18 +1700,7 @@ function autorizarConAdminYFinalizar(){
     departamento: ROSTRO_CONTEXTO.departamento
   }).then(function(resp){
     detenerCamaraRostro();
-    ROSTRO_CONTEXTO.payloadPendiente.ticketAutorizacion = resp.ticketAutorizacion;
-    if (ROSTRO_CONTEXTO.modo === 'INFUSION_LIDER') {
-      return llamarServidor('guardarSeccionLiderInfusion', ROSTRO_CONTEXTO.payloadPendiente).then(function(resp2){
-        manejarResultadoSeccionLiderInfusion(resp2);
-        return null; // evita que el .then de abajo también muestre el mensaje clásico
-      });
-    }
-    return llamarServidor('finalizarActividad', ROSTRO_CONTEXTO.payloadPendiente).then(function(){ return 'CLASICO'; });
-  }).then(function(marca){
-    if (marca === 'CLASICO') {
-      mostrarExito('Actividad registrada', 'Folio ' + ROSTRO_CONTEXTO.payloadPendiente.folio + ' avanzó a ' + ROSTRO_CONTEXTO.departamento + ' (autorizado por el Administrador).');
-    }
+    return enviarConTicketAutorizado_(resp.ticketAutorizacion, ' (autorizado por ' + (resp.metodo === 'SUPERVISOR_ANULACION' ? 'un Supervisor' : 'el Administrador') + ')');
   }).catch(function(err){ ponerError('errRostro', err); });
 }
 
