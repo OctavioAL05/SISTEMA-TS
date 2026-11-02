@@ -190,6 +190,7 @@
       <p class="subt">Cuentas de USUARIOS_EQUIPO: alta, PIN (el mismo para la tablet y los dashboards), desbloqueo y baja.</p>
       <div class="banner-error" id="errUsuarios" hidden></div>
       <div class="banner-ok" id="okUsuarios" hidden></div>
+      <div class="banner-error" id="avisosRoles" hidden style="text-align:left;"></div>
       <div class="lista-cuentas" id="listaUsuarios"></div>
       <button class="btn btn-primario" onclick="abrirNuevoUsuario()">+ Nueva cuenta</button>
       <button class="btn-link" onclick="cargarUsuarios()">Actualizar lista</button>
@@ -207,6 +208,7 @@
       <select id="nuTipo" onchange="cambiarTipoNuevo()">
         <option value="ADMIN_DASHBOARD">Administrador de dashboards</option>
         <option value="SUPERVISOR">Supervisor (Escaneo)</option>
+        <option value="CALIDAD">Calidad (Escaneo)</option>
         <option value="EQUIPO">Cuenta de equipo / líder</option>
       </select>
       <p class="campo-ayuda" id="nuAyuda"></p>
@@ -618,7 +620,10 @@ function irAPestana(cual){
 function tipoCuentaTexto(u){
   if (u.esCoordinador) return 'Administrador';
   if (String(u.rolDepartamento).toUpperCase() === 'ADMIN DASHBOARDS') return 'Administrador de dashboards';
-  if (u.esAdmin) return 'Supervisor / Calidad';
+  var rol = String(u.rolDepartamento).toUpperCase();
+  if (u.esAdmin && rol === 'SUPERVISOR') return 'Supervisor';
+  if (u.esAdmin && rol === 'CALIDAD') return 'Calidad';
+  if (u.esAdmin) return 'Cuenta superior (revisar rol)';
   return 'Equipo / líder';
 }
 function chipsUsuarioHtml(u){
@@ -634,8 +639,16 @@ function cargarUsuarios(){
   llamarServidor('listarUsuariosGestion', ADMIN_USUARIO, ADMIN_PIN).then(function(resp){
     USUARIOS = resp.usuarios || [];
     ROLES_CONOCIDOS = resp.roles || [];
+    pintarAvisosRoles(resp.avisos || []);
     pintarUsuarios();
   }).catch(function(err){ ponerError('errUsuarios', err); });
+}
+
+function pintarAvisosRoles(avisos){
+  var el = document.getElementById('avisosRoles');
+  if (!avisos.length) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = '<b>Revisar configuración de roles</b><ul>' + avisos.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>';
 }
 
 function pintarUsuarios(){
@@ -658,9 +671,10 @@ function pintarUsuarios(){
 var AYUDA_TIPO = {
   ADMIN_DASHBOARD: 'Entra a los dashboards por departamento y ve todos los equipos, con un PIN de 6 dígitos. No puede usar la tablet de Escaneo ni lleva rostro.',
   SUPERVISOR: 'Supervisor con su propio usuario y PIN de 6 dígitos: sirve para la tablet de Escaneo (Inspección, Hold, Entrega) y para los dashboards. Después puedes registrarle el rostro desde su cuenta.',
+  CALIDAD: 'Personal de Calidad con su propio usuario y PIN de 6 dígitos: en la tablet de Escaneo ve Inspección de Calidad, Marcar HOLD y Liberar HOLD. Después puedes registrarle el rostro desde su cuenta.',
   EQUIPO: 'Cuenta de un equipo de piso o de un líder aparte, con PIN de 4 dígitos: sirve para la tablet y para su dashboard de departamento. El EQUIPO_ID de un equipo con dashboard debe ser uno de los equipos que ya existen en el dashboard.'
 };
-var LONG_PIN_TIPO = { ADMIN_DASHBOARD: 6, SUPERVISOR: 6, EQUIPO: 4 };
+var LONG_PIN_TIPO = { ADMIN_DASHBOARD: 6, SUPERVISOR: 6, CALIDAD: 6, EQUIPO: 4 };
 function mostrarBloque(id, visible){ document.getElementById(id).style.display = visible ? '' : 'none'; }
 
 function abrirNuevoUsuario(){
