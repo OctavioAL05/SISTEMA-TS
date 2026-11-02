@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Registro de Rostros</title>
+  <title>Registro de Rostros y Usuarios</title>
   <style>
     :root{
       --azul:#2563eb; --azul-oscuro:#1d4ed8; --navy:#0f172a; --rojo:#dc2626;
@@ -75,13 +75,34 @@
     @keyframes girar{to{transform:rotate(360deg);}}
     .campo-ayuda{font-size:11.5px;color:var(--gris-claro);margin-top:4px;}
 
+    select{width:100%;padding:13px 12px;border:1.5px solid var(--borde);border-radius:10px;
+      font-size:16px;background:#fff;color:var(--texto);font-family:inherit;}
+    select:focus{outline:none;border-color:var(--azul);}
+    .pestanas{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--borde);}
+    .pestanas button{flex:1;background:none;border:none;border-bottom:3px solid transparent;padding:10px 6px;
+      font-size:14px;font-weight:700;color:var(--gris);cursor:pointer;font-family:inherit;}
+    .pestanas button.activa{color:var(--azul);border-bottom-color:var(--azul);}
+    .btn-secundario{background:#fff;color:var(--azul);border:1.5px solid var(--azul);}
+    .btn-peligro{background:#fff;color:var(--rojo);border:1.5px solid var(--rojo);}
+    .btn-chico{padding:11px 14px;font-size:14px;margin-top:8px;}
+    .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+    .chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+    .chip-si{background:#f0fdf4;color:var(--verde);}
+    .chip-no{background:#f1f5f9;color:var(--gris);}
+    .chip-adm{background:#eff6ff;color:var(--azul);}
+    .separador{border:none;border-top:1px solid var(--borde);margin:20px 0 4px;}
+    .aviso-ambar{background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:12.5px;padding:10px 12px;border-radius:10px;margin:10px 0;line-height:1.4;}
+    #p-usuario-nuevo [id^=nuBloque] label:not(.check-mostrar),#udBloqueRol label,#udBloqueDepto label{margin-top:14px;}
+    .check-mostrar{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--gris);margin:6px 0 0;}
+    .check-mostrar input{width:auto;}
+
     #videoRegistro{width:100%;max-width:320px;border-radius:12px;background:#0f172a;display:block;margin:10px auto;}
   </style>
 </head>
 <body>
 
 <header>
-  <div class="marca"><b>VUHL — REGISTRO DE ROSTROS</b><span id="lblHeader">Solo Administrador</span></div>
+  <div class="marca"><b>VUHL — ROSTROS Y USUARIOS</b><span id="lblHeader">Solo Administrador</span></div>
   <button id="btnSalir" hidden onclick="cerrarSesion()">Cerrar sesión</button>
 </header>
 
@@ -97,17 +118,37 @@
       <input type="text" id="inUsuario" autocomplete="username" placeholder="admin@dominio.com"
         onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('inPin').focus();}">
       <label>PIN</label>
-      <input type="password" id="inPin" inputmode="numeric" maxlength="4" placeholder="••••"
+      <input type="password" id="inPin" inputmode="numeric" maxlength="6" placeholder="PIN (6 dígitos)"
         onkeydown="if(event.key==='Enter'){event.preventDefault();hacerLogin();}">
       <button class="btn btn-primario" id="btnLogin" onclick="hacerLogin()">Entrar</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: CAMBIO OBLIGATORIO DE PIN (administrador con PIN de 4 dígitos) ===================== -->
+  <section id="p-cambio-pin" class="pantalla" hidden>
+    <div class="tarjeta">
+      <h1>Define tu nuevo PIN</h1>
+      <p class="subt">Tu PIN actual es de menos de 6 dígitos. Las cuentas de administrador usan un PIN de 6 dígitos (el mismo para la tablet, esta página y los dashboards).</p>
+      <div class="banner-error" id="errCambioPin" hidden></div>
+      <label>PIN nuevo (6 dígitos)</label>
+      <input type="password" id="inCambioPin1" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••">
+      <label>Confirma el PIN nuevo</label>
+      <input type="password" id="inCambioPin2" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="••••••"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCambioPin();}">
+      <button class="btn btn-primario" id="btnCambioPin" onclick="guardarCambioPin()">Guardar y entrar</button>
+      <button class="btn-link" onclick="cancelarCambioPin()">Cancelar</button>
     </div>
   </section>
 
   <!-- ===================== PANTALLA: LISTA DE CUENTAS ===================== -->
   <section id="p-lista" class="pantalla">
     <div class="tarjeta">
+      <div class="pestanas">
+        <button class="activa" onclick="irAPestana('rostros')">Rostros</button>
+        <button onclick="irAPestana('usuarios')">Usuarios</button>
+      </div>
       <h1>Cuentas</h1>
-      <p class="subt">Toca una cuenta para registrar o volver a registrar su rostro.</p>
+      <p class="subt">Toca una cuenta para registrar o volver a registrar su rostro. Para dar de alta cuentas o restablecer PINs, usa la pestaña Usuarios.</p>
       <div class="banner-error" id="errLista" hidden></div>
       <div class="lista-cuentas" id="listaCuentas"></div>
       <button class="btn-link" onclick="cargarCuentas()">Actualizar lista</button>
@@ -138,6 +179,121 @@
     </div>
   </section>
 
+  <!-- ===================== PANTALLA: USUARIOS (gestión de cuentas, 30 oct 2026) ===================== -->
+  <section id="p-usuarios" class="pantalla" hidden>
+    <div class="tarjeta">
+      <div class="pestanas">
+        <button onclick="irAPestana('rostros')">Rostros</button>
+        <button class="activa" onclick="irAPestana('usuarios')">Usuarios</button>
+      </div>
+      <h1>Usuarios</h1>
+      <p class="subt">Cuentas de USUARIOS_EQUIPO: alta, PIN (el mismo para la tablet y los dashboards), desbloqueo y baja.</p>
+      <div class="banner-error" id="errUsuarios" hidden></div>
+      <div class="banner-ok" id="okUsuarios" hidden></div>
+      <div class="lista-cuentas" id="listaUsuarios"></div>
+      <button class="btn btn-primario" onclick="abrirNuevoUsuario()">+ Nueva cuenta</button>
+      <button class="btn-link" onclick="cargarUsuarios()">Actualizar lista</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: NUEVA CUENTA ===================== -->
+  <section id="p-usuario-nuevo" class="pantalla" hidden>
+    <div class="tarjeta">
+      <h1>Nueva cuenta</h1>
+      <p class="subt">Elige el tipo de cuenta y llena los datos.</p>
+      <div class="banner-error" id="errNuevo" hidden></div>
+
+      <label>Tipo de cuenta</label>
+      <select id="nuTipo" onchange="cambiarTipoNuevo()">
+        <option value="ADMIN_DASHBOARD">Administrador de dashboards</option>
+        <option value="SUPERVISOR">Supervisor (Escaneo)</option>
+        <option value="EQUIPO">Cuenta de equipo / líder</option>
+      </select>
+      <p class="campo-ayuda" id="nuAyuda"></p>
+
+      <label>Usuario (correo)</label>
+      <input type="text" id="nuUsuario" autocomplete="off" autocapitalize="off" placeholder="nombre@empresa.com">
+
+      <div id="nuBloqueEquipo">
+        <label>EQUIPO_ID (único)</label>
+        <input type="text" id="nuEquipoId" autocomplete="off" autocapitalize="characters" placeholder="Ej. SUPERVISOR2, LIDER3, LAMINADOPYKA">
+      </div>
+      <div id="nuBloqueRol">
+        <label>Departamento / rol</label>
+        <input type="text" id="nuRol" list="listaRoles" autocomplete="off" placeholder="Ej. LAMINADO, TRIMMING, BOND IN...">
+        <datalist id="listaRoles"></datalist>
+      </div>
+      <div id="nuBloqueNombre">
+        <label>Nombre de la persona (opcional)</label>
+        <input type="text" id="nuNombre" autocomplete="off" placeholder="Nombre completo">
+      </div>
+      <div id="nuBloqueDeptoResp">
+        <label>Departamentos que puede liberar (opcional, separados por coma)</label>
+        <input type="text" id="nuDeptoResp" autocomplete="off" placeholder="Ej. CURADO, DETALLADO">
+      </div>
+      <div id="nuBloquePin">
+        <label id="nuLblPin">PIN</label>
+        <input type="password" id="nuPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••">
+      </div>
+
+      <button class="btn btn-primario" id="btnCrearUsuario" onclick="crearUsuario()">Crear cuenta</button>
+      <button class="btn-link" onclick="irAPestana('usuarios')">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- ===================== PANTALLA: DETALLE DE CUENTA ===================== -->
+  <section id="p-usuario-detalle" class="pantalla" hidden>
+    <div class="tarjeta">
+      <h1 id="udTitulo">Cuenta</h1>
+      <p class="subt" id="udSubt"></p>
+      <div class="chips" id="udChips"></div>
+      <div class="banner-error" id="errDetalle" hidden></div>
+      <div class="banner-ok" id="okDetalle" hidden></div>
+
+      <div id="udBloqueEdicion">
+        <label>Nombre de la persona</label>
+        <input type="text" id="udNombre" autocomplete="off">
+        <div id="udBloqueRol">
+          <label>Departamento / rol</label>
+          <input type="text" id="udRol" list="listaRoles" autocomplete="off">
+        </div>
+        <div id="udBloqueDepto">
+          <label>Departamentos que puede liberar (separados por coma)</label>
+          <input type="text" id="udDeptoResp" autocomplete="off">
+        </div>
+        <button class="btn btn-primario btn-chico" id="btnGuardarDetalle" onclick="guardarDetalleUsuario()">Guardar cambios</button>
+      </div>
+
+      <div id="udBloquePin">
+        <hr class="separador">
+        <h2>PIN (tablet, dashboards y esta página)</h2>
+        <p class="campo-ayuda" id="udAyudaPin"></p>
+        <input type="password" id="udPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Nuevo PIN">
+        <button class="btn btn-secundario btn-chico" id="btnResetPin" onclick="resetPinUsuario()">Guardar PIN (restablecer)</button>
+        <div id="udBloqueDesbloqueo">
+          <p class="campo-ayuda" id="udAyudaBloqueo"></p>
+          <button class="btn btn-secundario btn-chico" id="btnDesbloquear" onclick="desbloquearUsuario()">Desbloquear sin cambiar el PIN</button>
+        </div>
+      </div>
+
+      <div id="udBloqueRostro">
+        <hr class="separador">
+        <h2>Rostro</h2>
+        <button class="btn btn-secundario btn-chico" onclick="registrarRostroDeDetalle()">Registrar / volver a registrar rostro</button>
+      </div>
+
+      <div id="udBloqueBaja">
+        <hr class="separador">
+        <h2>Eliminar cuenta</h2>
+        <p class="campo-ayuda">Borra la fila de USUARIOS_EQUIPO. Para confirmar, escribe el usuario exacto.</p>
+        <input type="text" id="udConfirmar" autocomplete="off" autocapitalize="off" placeholder="Escribe el usuario para confirmar">
+        <button class="btn btn-peligro btn-chico" id="btnEliminar" onclick="eliminarUsuario()">Eliminar cuenta</button>
+      </div>
+
+      <button class="btn-link" onclick="irAPestana('usuarios')">Volver a la lista</button>
+    </div>
+  </section>
+
 </main>
 
 <!-- face-api.js: librería de reconocimiento facial (100% en el navegador, no envía fotos a ningún servidor).
@@ -164,8 +320,10 @@ var ROSTRO_STREAM = null;
  * ===================================================================================== */
 var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGqD22nBUZHRI1cpIrldlm8GycqUo3k8HVYcwptYB8ll40UtHFmdRR_wcNwcV-lGOB/exec';
 
+var CODIGO_ERROR = null; // codigo del último error del servidor (ej. 'CAMBIO_PIN'), para decidir qué pantalla mostrar
 function llamarServidor(nombreFn){
   var args = Array.prototype.slice.call(arguments, 1);
+  CODIGO_ERROR = null;
   return fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -173,7 +331,7 @@ function llamarServidor(nombreFn){
   })
     .then(function(r){ return r.json(); })
     .then(function(resp){
-      if (resp && resp.ok === false) { throw new Error(resp.error || 'Error desconocido.'); }
+      if (resp && resp.ok === false) { CODIGO_ERROR = resp.codigo || null; throw new Error(resp.error || 'Error desconocido.'); }
       return resp;
     })
     .catch(function(err){
@@ -218,9 +376,17 @@ function hacerLogin(){
   var pin = document.getElementById('inPin').value.trim();
   if (!usuario || !pin) { ponerError('errLogin','Escribe usuario y PIN.'); return; }
 
+  entrarComoAdministrador(usuario, pin);
+}
+
+/* Verifica primero con verificarPIN (así llega el aviso CAMBIO_PIN si el PIN es de 4 dígitos) y luego carga las cuentas. */
+function entrarComoAdministrador(usuario, pin){
   var btn = document.getElementById('btnLogin');
-  conBotonCargando(btn, 'Entrando...', function(){
-    return llamarServidor('listarCuentasRostro', usuario, pin).then(function(resp){
+  return conBotonCargando(btn, 'Entrando...', function(){
+    return llamarServidor('verificarPIN', usuario, pin).then(function(sesion){
+      if (!sesion.esCoordinador) { throw 'Solo el Administrador puede usar esta página.'; }
+      return llamarServidor('listarCuentasRostro', usuario, pin);
+    }).then(function(resp){
       ADMIN_USUARIO = usuario;
       ADMIN_PIN = pin;
       CUENTAS = resp.cuentas || [];
@@ -228,13 +394,45 @@ function hacerLogin(){
       document.getElementById('btnSalir').hidden = false;
       pintarLista();
       mostrarPantalla('p-lista');
-    }).catch(function(err){ ponerError('errLogin', err); });
+    }).catch(function(err){
+      if (CODIGO_ERROR === 'CAMBIO_PIN') {
+        CAMBIO_PIN_CTX = { usuario: usuario, pinActual: pin };
+        document.getElementById('inCambioPin1').value = ''; document.getElementById('inCambioPin2').value = '';
+        limpiarError('errCambioPin');
+        mostrarPantalla('p-cambio-pin');
+        return;
+      }
+      ponerError('errLogin', err);
+    });
+  });
+}
+
+/* ---- Cambio obligatorio de PIN (administrador con PIN de menos de 6 dígitos) ---- */
+var CAMBIO_PIN_CTX = null;
+function cancelarCambioPin(){
+  CAMBIO_PIN_CTX = null;
+  document.getElementById('inPin').value = '';
+  mostrarPantalla('p-login');
+}
+function guardarCambioPin(){
+  limpiarError('errCambioPin');
+  var ctx = CAMBIO_PIN_CTX; if (!ctx) { mostrarPantalla('p-login'); return; }
+  var n1 = document.getElementById('inCambioPin1').value.trim();
+  var n2 = document.getElementById('inCambioPin2').value.trim();
+  if (!/^\d{6}$/.test(n1)) { ponerError('errCambioPin', 'El PIN debe ser de exactamente 6 dígitos.'); return; }
+  if (n1 !== n2) { ponerError('errCambioPin', 'La confirmación no coincide con el PIN nuevo.'); return; }
+  conBotonCargando(document.getElementById('btnCambioPin'), 'Guardando...', function(){
+    return llamarServidor('cambiarPinPropio', ctx.usuario, ctx.pinActual, n1).then(function(){
+      CAMBIO_PIN_CTX = null;
+      document.getElementById('inCambioPin1').value = ''; document.getElementById('inCambioPin2').value = '';
+      return entrarComoAdministrador(ctx.usuario, n1);
+    }).catch(function(err){ ponerError('errCambioPin', err); });
   });
 }
 
 function cerrarSesion(){
   detenerCamaraRegistro();
-  ADMIN_USUARIO = null; ADMIN_PIN = null; CUENTAS = []; CUENTA_SELECCIONADA = null;
+  ADMIN_USUARIO = null; ADMIN_PIN = null; CUENTAS = []; CUENTA_SELECCIONADA = null; USUARIOS = []; USUARIO_SELECCIONADO = null;
   document.getElementById('btnSalir').hidden = true;
   document.getElementById('inUsuario').value = '';
   mostrarPantalla('p-login');
@@ -263,8 +461,8 @@ function pintarLista(){
     var rol = c.esAdmin ? (c.rolDepartamento || 'Supervisor/Calidad') : (c.rolDepartamento || 'Equipo');
     if (c.departamentoResponsable) { rol += ' · libera: ' + c.departamentoResponsable; }
     b.innerHTML =
-      '<div class="info"><b>' + (c.nombreLider || c.usuario) + '</b>' +
-      '<span>' + c.equipoId + ' · ' + rol + '</span></div>' +
+      '<div class="info"><b>' + esc(c.nombreLider || c.usuario) + '</b>' +
+      '<span>' + esc(c.equipoId) + ' · ' + esc(rol) + '</span></div>' +
       '<span class="estado-rostro ' + (c.tieneRostro ? 'estado-si' : 'estado-no') + '">' +
       (c.tieneRostro ? 'Con rostro' : 'Sin rostro') + '</span>';
     cont.appendChild(b);
@@ -378,6 +576,236 @@ function guardarDepartamentoResponsable(){
         : 'Se quitó la asignación de departamento de ' + equipoId + '.';
       cargarCuentas();
     }).catch(function(err){ ponerError('errRegistrar', err); });
+  });
+}
+
+
+/* =====================================================================================
+ * GESTIÓN DE USUARIOS (30 oct 2026) — alta/edición/contraseña de dashboards/PIN/baja.
+ * Todas las llamadas llevan el usuario+PIN del Administrador (en memoria); el backend
+ * (Escaneo.gs: *UsuarioGestion*) valida que sea la cuenta Administrador.
+ * ===================================================================================== */
+var USUARIOS = [];
+var ROLES_CONOCIDOS = [];
+var USUARIO_SELECCIONADO = null;
+
+function esc(t){
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function(ch){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch];
+  });
+}
+function ponerOk(idBanner, mensaje){
+  var el = document.getElementById(idBanner);
+  el.textContent = mensaje; el.hidden = false;
+}
+function quitarOk(idBanner){
+  var el = document.getElementById(idBanner);
+  el.hidden = true; el.textContent = '';
+}
+
+function irAPestana(cual){
+  detenerCamaraRegistro();
+  quitarOk('okUsuarios');
+  if (cual === 'usuarios') {
+    mostrarPantalla('p-usuarios');
+    cargarUsuarios();
+  } else {
+    mostrarPantalla('p-lista');
+    cargarCuentas();
+  }
+}
+
+function tipoCuentaTexto(u){
+  if (u.esCoordinador) return 'Administrador';
+  if (String(u.rolDepartamento).toUpperCase() === 'ADMIN DASHBOARDS') return 'Administrador de dashboards';
+  if (u.esAdmin) return 'Supervisor / Calidad';
+  return 'Equipo / líder';
+}
+function chipsUsuarioHtml(u){
+  function chip(ok, txt){ return '<span class="chip ' + (ok ? 'chip-si' : 'chip-no') + '">' + txt + (ok ? ' ✓' : ' —') + '</span>'; }
+  var extra = '';
+  if (u.usaPasswordAnterior) extra += '<span class="chip chip-no">Sin PIN (contraseña anterior)</span>';
+  if (u.bloqueadoMin > 0) extra += '<span class="chip chip-no">Bloqueada ' + u.bloqueadoMin + ' min</span>';
+  return chip(u.tienePin, 'PIN ' + u.pinLongitud + ' díg.') + chip(u.tieneRostro, 'Rostro') + extra;
+}
+
+function cargarUsuarios(){
+  limpiarError('errUsuarios');
+  llamarServidor('listarUsuariosGestion', ADMIN_USUARIO, ADMIN_PIN).then(function(resp){
+    USUARIOS = resp.usuarios || [];
+    ROLES_CONOCIDOS = resp.roles || [];
+    pintarUsuarios();
+  }).catch(function(err){ ponerError('errUsuarios', err); });
+}
+
+function pintarUsuarios(){
+  var cont = document.getElementById('listaUsuarios');
+  cont.innerHTML = '';
+  if (!USUARIOS.length) { cont.innerHTML = '<p class="campo-ayuda">No hay cuentas.</p>'; return; }
+  USUARIOS.forEach(function(u, i){
+    var b = document.createElement('button');
+    b.className = 'fila-cuenta';
+    b.onclick = function(){ abrirDetalleUsuario(i); };
+    b.innerHTML =
+      '<div class="info"><b>' + esc(u.nombreLider || u.usuario) + '</b>' +
+      '<span>' + esc(u.nombreLider ? u.usuario + ' · ' : '') + esc(tipoCuentaTexto(u)) + (u.equipoId ? ' · ' + esc(u.equipoId) : '') + '</span>' +
+      '<div class="chips">' + chipsUsuarioHtml(u) + '</div></div>';
+    cont.appendChild(b);
+  });
+}
+
+/* ---- Nueva cuenta ---- */
+var AYUDA_TIPO = {
+  ADMIN_DASHBOARD: 'Entra a los dashboards por departamento y ve todos los equipos, con un PIN de 6 dígitos. No puede usar la tablet de Escaneo ni lleva rostro.',
+  SUPERVISOR: 'Supervisor con su propio usuario y PIN de 6 dígitos: sirve para la tablet de Escaneo (Inspección, Hold, Entrega) y para los dashboards. Después puedes registrarle el rostro desde su cuenta.',
+  EQUIPO: 'Cuenta de un equipo de piso o de un líder aparte, con PIN de 4 dígitos: sirve para la tablet y para su dashboard de departamento. El EQUIPO_ID de un equipo con dashboard debe ser uno de los equipos que ya existen en el dashboard.'
+};
+var LONG_PIN_TIPO = { ADMIN_DASHBOARD: 6, SUPERVISOR: 6, EQUIPO: 4 };
+function mostrarBloque(id, visible){ document.getElementById(id).style.display = visible ? '' : 'none'; }
+
+function abrirNuevoUsuario(){
+  limpiarError('errNuevo');
+  ['nuUsuario','nuEquipoId','nuRol','nuNombre','nuDeptoResp','nuPin'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('nuTipo').value = 'ADMIN_DASHBOARD';
+  document.getElementById('listaRoles').innerHTML = ROLES_CONOCIDOS.map(function(r){ return '<option value="' + esc(r) + '">'; }).join('');
+  cambiarTipoNuevo();
+  mostrarPantalla('p-usuario-nuevo');
+}
+
+function cambiarTipoNuevo(){
+  var t = document.getElementById('nuTipo').value;
+  document.getElementById('nuAyuda').textContent = AYUDA_TIPO[t] || '';
+  mostrarBloque('nuBloqueEquipo', t !== 'ADMIN_DASHBOARD');
+  mostrarBloque('nuBloqueRol', t === 'EQUIPO');
+  mostrarBloque('nuBloqueNombre', t !== 'ADMIN_DASHBOARD');
+  mostrarBloque('nuBloqueDeptoResp', t === 'EQUIPO');
+  var largo = LONG_PIN_TIPO[t] || 4;
+  var pinEl = document.getElementById('nuPin');
+  pinEl.maxLength = largo; pinEl.placeholder = largo === 6 ? '••••••' : '••••';
+  document.getElementById('nuLblPin').textContent = largo + ' dígitos' + (t === 'ADMIN_DASHBOARD' ? ' (obligatorio)' : ' (opcional — se puede poner después)');
+}
+
+function crearUsuario(){
+  limpiarError('errNuevo');
+  var t = document.getElementById('nuTipo').value;
+  var payload = {
+    idUsuarioAdmin: ADMIN_USUARIO, pinAdmin: ADMIN_PIN, tipo: t,
+    usuario: document.getElementById('nuUsuario').value.trim(),
+    equipoId: document.getElementById('nuEquipoId').value.trim(),
+    rolDepartamento: document.getElementById('nuRol').value.trim(),
+    nombreLider: document.getElementById('nuNombre').value.trim(),
+    departamentoResponsable: document.getElementById('nuDeptoResp').value.trim(),
+    pin: document.getElementById('nuPin').value.trim()
+  };
+  if (t === 'ADMIN_DASHBOARD') { payload.equipoId = ''; }
+  if (!payload.usuario) { ponerError('errNuevo', 'Escribe el usuario (correo).'); return; }
+  if (t === 'ADMIN_DASHBOARD' && !payload.pin) { ponerError('errNuevo', 'Escribe el PIN de 6 dígitos de la cuenta.'); return; }
+  if (payload.pin && (!/^\d+$/.test(payload.pin) || payload.pin.length !== LONG_PIN_TIPO[t])) {
+    ponerError('errNuevo', 'El PIN de este tipo de cuenta debe ser de exactamente ' + LONG_PIN_TIPO[t] + ' dígitos.'); return;
+  }
+  var btn = document.getElementById('btnCrearUsuario');
+  conBotonCargando(btn, 'Creando...', function(){
+    return llamarServidor('crearUsuarioGestion', payload).then(function(){
+      document.getElementById('nuPin').value = '';
+      irAPestana('usuarios');
+      ponerOk('okUsuarios', 'Cuenta creada: ' + payload.usuario.toLowerCase() + '.');
+    }).catch(function(err){ ponerError('errNuevo', err); });
+  });
+}
+
+/* ---- Detalle de cuenta ---- */
+function abrirDetalleUsuario(i){
+  var u = USUARIOS[i]; if (!u) return;
+  USUARIO_SELECCIONADO = u;
+  limpiarError('errDetalle'); quitarOk('okDetalle');
+  var esAdminDash = String(u.rolDepartamento).toUpperCase() === 'ADMIN DASHBOARDS';
+  document.getElementById('udTitulo').textContent = u.nombreLider || u.usuario;
+  document.getElementById('udSubt').textContent = u.usuario + ' · ' + tipoCuentaTexto(u) + (u.equipoId ? ' · ' + u.equipoId : '');
+  document.getElementById('udChips').innerHTML = chipsUsuarioHtml(u);
+  document.getElementById('udNombre').value = u.nombreLider || '';
+  document.getElementById('udRol').value = u.rolDepartamento || '';
+  document.getElementById('udDeptoResp').value = u.departamentoResponsable || '';
+  ['udPin','udConfirmar'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('listaRoles').innerHTML = ROLES_CONOCIDOS.map(function(r){ return '<option value="' + esc(r) + '">'; }).join('');
+
+  mostrarBloque('udBloqueEdicion', !u.esCoordinador);
+  mostrarBloque('udBloqueRol', !u.esAdmin);
+  mostrarBloque('udBloqueDepto', !u.esAdmin);
+  mostrarBloque('udBloquePin', !u.esCoordinador);
+  var pinEl = document.getElementById('udPin');
+  pinEl.maxLength = u.pinLongitud; pinEl.placeholder = 'Nuevo PIN (' + u.pinLongitud + ' dígitos)';
+  document.getElementById('udAyudaPin').textContent =
+    (u.tienePin ? 'Esta cuenta ya tiene PIN. ' : (u.usaPasswordAnterior ? 'Esta cuenta todavía entra a los dashboards con su contraseña anterior: al guardar un PIN, esa contraseña deja de servir. ' : 'Esta cuenta todavía no tiene PIN. ')) +
+    'Se restablece aquí cuando la persona olvidó el suyo (PIN de ' + u.pinLongitud + ' dígitos).';
+  mostrarBloque('udBloqueDesbloqueo', u.bloqueadoMin > 0);
+  document.getElementById('udAyudaBloqueo').textContent = u.bloqueadoMin > 0
+    ? 'La cuenta está bloqueada por intentos fallidos (faltan unos ' + u.bloqueadoMin + ' min). Guardar un PIN nuevo también la desbloquea.' : '';
+  mostrarBloque('udBloqueRostro', !!u.equipoId && !u.esCoordinador && !esAdminDash);
+  mostrarBloque('udBloqueBaja', !u.esCoordinador);
+  mostrarPantalla('p-usuario-detalle');
+}
+
+function refrescarYVolverADetalle(usuario, mensaje){
+  return llamarServidor('listarUsuariosGestion', ADMIN_USUARIO, ADMIN_PIN).then(function(resp){
+    USUARIOS = resp.usuarios || []; ROLES_CONOCIDOS = resp.roles || [];
+    var i = USUARIOS.findIndex(function(x){ return String(x.usuario).toLowerCase() === String(usuario).toLowerCase(); });
+    if (i === -1) { irAPestana('usuarios'); return; }
+    abrirDetalleUsuario(i);
+    ponerOk('okDetalle', mensaje);
+  });
+}
+
+function guardarDetalleUsuario(){
+  limpiarError('errDetalle'); quitarOk('okDetalle');
+  var u = USUARIO_SELECCIONADO;
+  var payload = { idUsuarioAdmin: ADMIN_USUARIO, pinAdmin: ADMIN_PIN, usuarioObjetivo: u.usuario,
+    nombreLider: document.getElementById('udNombre').value.trim(),
+    departamentoResponsable: document.getElementById('udDeptoResp').value.trim() };
+  if (!u.esAdmin) payload.rolDepartamento = document.getElementById('udRol').value.trim();
+  conBotonCargando(document.getElementById('btnGuardarDetalle'), 'Guardando...', function(){
+    return llamarServidor('actualizarUsuarioGestion', payload)
+      .then(function(){ return refrescarYVolverADetalle(u.usuario, 'Cambios guardados.'); })
+      .catch(function(err){ ponerError('errDetalle', err); });
+  });
+}
+
+function desbloquearUsuario(){
+  limpiarError('errDetalle'); quitarOk('okDetalle');
+  var u = USUARIO_SELECCIONADO;
+  conBotonCargando(document.getElementById('btnDesbloquear'), 'Desbloqueando...', function(){
+    return llamarServidor('desbloquearUsuarioGestion', { idUsuarioAdmin: ADMIN_USUARIO, pinAdmin: ADMIN_PIN, usuarioObjetivo: u.usuario })
+      .then(function(){ return refrescarYVolverADetalle(u.usuario, 'Cuenta desbloqueada.'); })
+      .catch(function(err){ ponerError('errDetalle', err); });
+  });
+}
+
+function resetPinUsuario(){
+  limpiarError('errDetalle'); quitarOk('okDetalle');
+  var u = USUARIO_SELECCIONADO;
+  var pin = document.getElementById('udPin').value.trim();
+  if (!/^\d+$/.test(pin) || pin.length !== u.pinLongitud) { ponerError('errDetalle', 'El PIN de esta cuenta debe ser de exactamente ' + u.pinLongitud + ' dígitos.'); return; }
+  conBotonCargando(document.getElementById('btnResetPin'), 'Guardando...', function(){
+    return llamarServidor('altaOResetPin', { usuarioObjetivo: u.usuario, nuevoPin: pin, idUsuarioAdmin: ADMIN_USUARIO, pinAdmin: ADMIN_PIN })
+      .then(function(){ return refrescarYVolverADetalle(u.usuario, 'PIN guardado.'); })
+      .catch(function(err){ ponerError('errDetalle', err); });
+  });
+}
+
+function registrarRostroDeDetalle(){
+  var u = USUARIO_SELECCIONADO;
+  abrirRegistro({ equipoId: u.equipoId, usuario: u.usuario, rolDepartamento: u.rolDepartamento, esAdmin: u.esAdmin,
+    nombreLider: u.nombreLider, departamentoResponsable: u.departamentoResponsable, tieneRostro: u.tieneRostro });
+}
+
+function eliminarUsuario(){
+  limpiarError('errDetalle'); quitarOk('okDetalle');
+  var u = USUARIO_SELECCIONADO;
+  var conf = document.getElementById('udConfirmar').value.trim();
+  if (conf.toLowerCase() !== String(u.usuario).toLowerCase()) { ponerError('errDetalle', 'Escribe el usuario exacto (' + u.usuario + ') para confirmar.'); return; }
+  conBotonCargando(document.getElementById('btnEliminar'), 'Eliminando...', function(){
+    return llamarServidor('eliminarUsuarioGestion', { idUsuarioAdmin: ADMIN_USUARIO, pinAdmin: ADMIN_PIN, usuarioObjetivo: u.usuario, confirmarUsuario: conf })
+      .then(function(){ irAPestana('usuarios'); ponerOk('okUsuarios', 'Cuenta eliminada: ' + u.usuario + '.'); })
+      .catch(function(err){ ponerError('errDetalle', err); });
   });
 }
 
